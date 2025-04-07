@@ -1,0 +1,14 @@
+{
+    "questions": [
+        {
+            "type" : "choice",
+            "question" : "How is your appetite on a scale of one to five?",
+            "choices" : ["1 - Very good", "2 - Good", "3 - Normal", "4 - Poor", "5 - Very poor"]
+        },
+        {
+            "type" : "choice",
+            "question" : "What led to your poor appetite? (Choose all that apply)",
+            "choices" : ["Nausea and vomiting ", "Mouth sores", "Swallowing difficulties", "Taste changes", "Feeling of fullness", "Low mood / Lost interest in taking food and drinks", "Others, please specify"]
+        }
+    ]
+}
