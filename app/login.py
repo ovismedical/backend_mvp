@@ -1,0 +1,101 @@
+from fastapi import Depends, FastAPI, HTTPException, status, APIRouter
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
+import json 
+import os
+from datetime import datetime
+from pymongo import MongoClient
+from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+loginrouter = APIRouter(prefix = "/login", tags = ["login"])
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+
+def get_db():
+    client = MongoClient(MONGODB_URI)
+    db = client["ovis-demo"]
+    return db
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+class User(BaseModel):
+    username: str
+    password: str
+    email: str
+    full_name: str
+    sex: str
+    dob: str
+
+class UserInDB(User):
+    hashed_password: str
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def verify_password(password, hashed_password):
+    return pwd_context.verify(password, hashed_password)
+
+def hash_password(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    users = db["users"]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = users.find_one({"username": username}, {"_id": 0, "password": 0})
+    if not user:
+        raise credentials_exception
+    return user
+
+@loginrouter.post("/register")
+def register(user: User, db = Depends(get_db)):
+    users = db["users"]
+    if users.find_one({"username": user.username}):
+        raise HTTPException(status_code=400, detail="User already exists")
+    hashed = hash_password(user.password)
+    user.password = hashed
+    users.insert_one(user.dict())
+    return {"msg": "User created"}
+
+@loginrouter.post("/token")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
+    users = db["users"]
+    user = users.find_one({"username": form_data.username})
+    if not user or not verify_password(form_data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_access_token({"sub": user["username"]})
+    return {"access_token": token, "token_type": "bearer"}
+
+@loginrouter.get("/test")
+def read_users_me(user = Depends(get_user)):
+    return {"username": user["username"]}
+
+@loginrouter.get("/personalinfo")
+async def get_info(user = Depends(get_user), db = Depends(get_db)):
+    return user
