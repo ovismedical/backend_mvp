@@ -1,4 +1,5 @@
 import openai
+import os
 import json
 import time
 from datetime import datetime
@@ -8,108 +9,31 @@ from tts_config import AzureSpeechService
 from gpt_json import assessment_function
 
 # Set your API key
-client = openai.OpenAI(api_key="")
+client = openai.OpenAI(api_key="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")
 
+# Initialize message queue for keyboard input
+_input_queue = []
+_web_interface_mode = False   
+_message_source_is_queue = False
+
+
+def set_web_interface_mode(enabled=True):
+    global _web_interface_mode
+    _web_interface_mode = enabled
+
+
+def add_message_to_queue(message):
+    global _input_queue
+    _input_queue.append(message)
+    print(f"\n[DEBUG] Added message to input queue: '{message}'")
+    return True
 # System prompt for symptom assessment conversation
-system_prompt = """
-You are a friendly, conversational human nurse designed to assess cancer symptoms in elderly patients through natural conversation. Your goal is to evaluate five key symptoms (fatigue, appetite, nausea, cough, and pain) on a 1-5 scale without making the interaction feel like a medical interrogation.
-
-APPROACH:
-- The context is the patient lives in hong kong, so use context specific scenarios
-- Use a warm, unhurried tone suitable for elderly patients
-- Include small personal anecdotes and appropriate humor
-- Ask open-ended questions that naturally lead to symptom information
-- Listen carefully for keywords indicating symptom severity
-- Maintain a conversational flow that feels like catching up with a friend
-- Remember details the patient shares to reference later
-
-CONVERSATION STRUCTURE:
-1. Begin with genuine small talk about observable items or shared interests
-2. Transition naturally to topics that reveal symptom information:
-   - Energy levels and daily activities (to assess FATIGUE)
-   - Food preferences and eating habits (to assess APPETITE and NAUSEA)
-   - Weather and respiratory impacts (to assess COUGH)
-   - Movement and comfort levels (to assess PAIN)
-3. Include fun tidbits and anecdotes throughout to keep engagement high
-4. End with an open question about any other concerns
-
-SYMPTOM ASSESSMENT SCALES:
-For each symptom, analyze patient responses to determine severity level (1-5):
-
-FATIGUE SCALE:
-- Level 1: Minimal fatigue; normal activity levels
-- Level 2: Mild fatigue; slight limitation of activities
-- Level 3: Moderate fatigue; needs daily rest; significant activity reduction
-- Level 4: Severe fatigue; needs help with daily activities
-- Level 5: Extreme fatigue; bed-bound; unable to care for self
-
-APPETITE SCALE:
-- Level 1: Normal appetite
-- Level 2: Slightly reduced interest in food; >75% normal intake
-- Level 3: Moderately reduced appetite; 50-75% normal intake
-- Level 4: Severely reduced appetite; 25-50% normal intake
-- Level 5: Minimal to no appetite; <25% normal intake
-
-NAUSEA SCALE:
-- Level 1: No nausea
-- Level 2: Occasional mild queasiness; doesn't affect eating
-- Level 3: Intermittent nausea affecting food choices; 3-5 episodes daily
-- Level 4: Frequent nausea; significantly limits intake; 6-8 episodes daily
-- Level 5: Constant nausea; minimal intake possible; may include vomiting
-
-COUGH SCALE:
-- Level 1: Occasional throat clearing; minimal
-- Level 2: Infrequent cough; 1-2 episodes daily; mostly dry
-- Level 3: Several coughing episodes daily; sometimes productive
-- Level 4: Frequent coughing fits; disrupts activities; painful
-- Level 5: Constant/severe coughing; may include blood; prevents basic activities
-
-PAIN SCALE:
-- Level 1: Minimal; noticeable but doesn't limit activities
-- Level 2: Mild; minor limitation; no medication needed
-- Level 3: Moderate; requires non-prescription medication; limits some activities
-- Level 4: Severe; requires prescription medication; significant limitation
-- Level 5: Extreme; inadequate relief with medication; incapacitating
-
-KEYWORDS TO LISTEN FOR:
-Evaluate each symptom based on specific phrases the patient uses:
-
-Fatigue keywords:
-- Level 1: "I'm doing fine," "normal energy," "just a little tired sometimes"
-- Level 2: "I need to rest after chores," "not as much pep," "cut back a bit"
-- Level 3: "I need naps most days," "given up activities," "tired most of the time"
-- Level 4: "barely get out of bed," "need help with basics," "exhausted all day"
-- Level 5: "can't get out of bed without help," "too tired to eat/talk/watch TV"
-
-Appetite keywords:
-- Level 1: "Eating normally," "appetite is fine," "enjoying my meals"
-- Level 2: "Not quite as hungry," "smaller portions," "less interest in food"
-- Level 3: "Skipping meals sometimes," "have to force myself," "only eating half"
-- Level 4: "Barely eating," "just picking," "only liquids/soft foods"
-- Level 5: "Can't eat at all," "just a few bites," "no interest in food whatsoever"
-
-Nausea keywords:
-- Level 1: "No nausea," "stomach feels fine"
-- Level 2: "Occasional queasiness," "passes quickly," "doesn't affect eating"
-- Level 3: "Have to be careful what I eat," "feel sick after meals," "few times a day"
-- Level 4: "Nauseous most of the day," "hard to keep food down," "need medicine"
-- Level 5: "Constant nausea," "can't keep anything down," "vomiting multiple times"
-
-Cough keywords:
-- Level 1: "Just clearing my throat," "once in a while," "hardly notice it"
-- Level 2: "A few times a day," "mostly dry," "not bothersome"
-- Level 3: "Several times daily," "disrupts my TV shows," "some mucus"
-- Level 4: "Coughing fits," "keeps me up," "hurts when I cough," "productive"
-- Level 5: "Can't stop coughing," "exhausting," "brings up phlegm/blood," "all day and night"
-
-Pain keywords:
-- Level 1: "Just a twinge," "hardly notice it," "doesn't bother me"
-- Level 2: "Noticeable but manageable," "comes and goes," "don't need medication"
-- Level 3: "Take over-the-counter meds," "have to stop activities," "distracting"
-- Level 4: "Need prescription pain relief," "hard to concentrate," "limits what I can do"
-- Level 5: "Nothing helps," "all I can think about," "can't function," "unbearable"
-
-After the conversation, you will be asked to provide a structured assessment summary with ratings for each symptom based on the patient's statements.
+try:
+    with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+        system_prompt = f.read()
+except Exception as e:
+    # Create a fallback HTML in case of failure
+    system_prompt = """You are a friendly, conversational human nurse designed to assess cancer symptoms in elderly patients through natural conversation. Your goal is to evaluate five key symptoms (fatigue, appetite, nausea, cough, and pain) on a 1-5 scale without making the interaction feel like a medical interrogation.
 """
 
 # Voice-specific system prompt addition
@@ -121,7 +45,7 @@ IMPORTANT VOICE INTERACTION GUIDELINES:
 """
 
 # Function to handle the entire conversation and produce the structured output
-def conduct_assessment(patient_id, language="en", input_mode="keyboard", conversation_history=None):
+def conduct_assessment(patient_id, language="en", input_mode="keyboard", conversation_history=None, message_queue=None):
     """
     Conduct a symptom assessment conversation with a patient.
     
@@ -147,6 +71,8 @@ def conduct_assessment(patient_id, language="en", input_mode="keyboard", convers
     full_system_prompt = system_prompt
     if input_mode == "speech":
         full_system_prompt = voice_prompt_addition + full_system_prompt
+    
+
     
     # Add language instruction
     if language == "zh":
@@ -174,7 +100,7 @@ def conduct_assessment(patient_id, language="en", input_mode="keyboard", convers
             conversation_history.append({"role": "assistant", "content": assistant_message})
             
             # Output the assistant's message
-            print("\nAssistant:", assistant_message)
+            ("\nAssistant:", assistant_message)
             
             # Speak the greeting if using speech mode
             if input_mode == "speech" and speech_service:
@@ -186,42 +112,107 @@ def conduct_assessment(patient_id, language="en", input_mode="keyboard", convers
     # Continue the conversation until we have enough information
     conversation_complete = False
     turns = 0
-    max_turns = 10  # Set a reasonable limit
+    max_turns = 30  # Set a reasonable limit
     assistant_message = None
     
+    
+
+
     while not conversation_complete and turns < max_turns:
         # Get user input based on input mode
         if input_mode == "keyboard":
-            print("\nPatient (type 'end assessment' to finish): ", end="")
-            user_input = input()
+            global _message_source_is_queue  # Make sure to access the global variable
+            
+            if _web_interface_mode:
+                # In web interface mode, we wait for input to appear in the queue
+                print("\n[DEBUG] Waiting for input from web interface...")
+                while not _input_queue and not conversation_complete:
+                    # Check if we should end based on conversation_history
+                    for msg in conversation_history[-5:] if len(conversation_history) >= 5 else conversation_history:
+                        if msg.get("role") == "user" and "finish" in msg.get("content", "").lower():
+                            print("\n[DEBUG] Found 'finish' in recent messages, ending assessment")
+                            user_input = "end assessment"
+                            break
+                    else:
+                        # No "finish" found, keep waiting
+                        time.sleep(0.5)  # Don't hog CPU while waiting
+                        continue
+                    # If we got here, we found a finish message
+                    break
+                
+                # If we have something in the queue, use it
+                if _input_queue:
+                    user_input = _input_queue.pop(0)
+                    print(f"\n[DEBUG] Using input from queue: '{user_input}'")
+                    
+                    # Set the flag to indicate this message came from the queue
+                    _message_source_is_queue = True
+                    conversation_history.append({"role": "user", "content": user_input})
+                    print(f"\n[DEBUG] Added message to conversation history: '{user_input}'")
+
+                else:
+                    # Otherwise, we're finishing
+                    user_input = "end assessment"
+            else:
+                # Traditional terminal mode
+                print("\nPatient (type 'end assessment' to finish): ", end="")
+                user_input = input()
+
         else:  # speech mode
-            # Wait a moment to make sure any previous TTS has finished
-            time.sleep(0.5)
-            
-            # STT: Listen for patient response
-            print("\nListening for patient response... (speak now or say 'end assessment' to finish)")
-            user_input = speech_service.speech_to_text()
-            
-            # Handle failed speech recognition
-            if not user_input:
-                retry_message = "I'm sorry, I didn't catch that. Could you please repeat?"
-                if language == "zh":
-                    retry_message = "對不起，我沒聽清楚。您能再說一次嗎？"
+            if _web_interface_mode:
+                # For web interface, speech recognition happens through the /api/speech/recognize endpoint
+                # Just check the queue for messages like we do for keyboard
+                print("\n[DEBUG] Waiting for speech input from web interface...")
+                while not _input_queue and not conversation_complete:
+                    # Check if we should end based on conversation_history
+                    for msg in conversation_history[-5:] if len(conversation_history) >= 5 else conversation_history:
+                        if msg.get("role") == "user" and "finish" in msg.get("content", "").lower():
+                            print("\n[DEBUG] Found 'finish' in recent messages, ending assessment")
+                            user_input = "end assessment"
+                            break
+                    else:
+                        # No "finish" found, keep waiting
+                        time.sleep(0.5)  # Don't hog CPU while waiting
+                        continue
+                    # If we got here, we found a finish message
+                    break
                 
-                print("Assistant:", retry_message)
-                if speech_service:
-                    speech_service.text_to_speech(retry_message)
-                
-                # Try again
-                print("Listening again...")
+                # If we have something in the queue, use it
+                if _input_queue:
+                    user_input = _input_queue.pop(0)
+                    print(f"\n[DEBUG] Using speech input from queue: '{user_input}'")
+                    _message_source_is_queue = True
+                else:
+                    # Otherwise, we're finishing
+                    user_input = "end assessment"
+            else:                
+                # Wait a moment to make sure any previous TTS has finished
+                time.sleep(0.5)
+                print
+                # STT: Listen for patient response
+                print("\nListening for patient response... (speak now or say 'end assessment' to finish)")
                 user_input = speech_service.speech_to_text()
+                
+                # Handle failed speech recognition
                 if not user_input:
-                    user_input = "No response"
+                    retry_message = "I'm sorry, I didn't catch that. Could you please repeat?"
+                    if language == "zh":
+                        retry_message = "對不起，我沒聽清楚。您能再說一次嗎？"
+                    
+                    print("Assistant:", retry_message)
+                    if speech_service:
+                        speech_service.text_to_speech(retry_message)
+                    
+                    # Try again
+                    print("Listening again...")
+                    user_input = speech_service.speech_to_text()
+                    if not user_input:
+                        user_input = "No response"
+                
+                print(f"Patient: {user_input}")
             
-            print(f"Patient: {user_input}")
-        
-        # Add user input to conversation history
-        conversation_history.append({"role": "user", "content": user_input})
+            # Add user input to conversation history
+            conversation_history.append({"role": "user", "content": user_input})
         
         # Check if this should be the final turn
         if "finish" in user_input.lower() or turns == max_turns - 1:
@@ -282,7 +273,7 @@ def conduct_assessment(patient_id, language="en", input_mode="keyboard", convers
                     assessment_data["oncologist_notification_level"] = "none"
                 
                 # Save the assessment to file
-                filename = f"patient_{patient_id}_assessment_{assessment_data['timestamp'].replace(':', '-')}.json"
+                filename = os.path.join("assessment_records", f"patient_{patient_id}_assessment_{assessment_data['timestamp'].replace(':', '-')}.json")
                 try:
                     with open(filename, "w", encoding="utf-8") as f:
                         json.dump(assessment_data, f, indent=2, ensure_ascii=False)
