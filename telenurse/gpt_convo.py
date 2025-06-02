@@ -9,7 +9,7 @@ from tts_config import AzureSpeechService
 from gpt_json import assessment_function
 
 # Set your API key
-client = openai.OpenAI(api_key="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")
+client = openai.OpenAI(api_key="")
 
 # Initialize message queue for keyboard input
 _input_queue = []
