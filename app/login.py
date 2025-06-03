@@ -6,14 +6,13 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 import json 
 import os
-from datetime import datetime
-from pymongo import MongoClient
 from datetime import datetime, timezone, timedelta
+from pymongo import MongoClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
-loginrouter = APIRouter(prefix = "/login", tags = ["login"])
+loginrouter = APIRouter(tags = ["login"])
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 
@@ -26,16 +25,13 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-class User(BaseModel):
+class UserCreate(BaseModel):
     username: str
     password: str
     email: str
     full_name: str
     sex: str
     dob: str
-
-class UserInDB(User):
-    hashed_password: str
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -47,10 +43,11 @@ def verify_password(password, hashed_password):
 def hash_password(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict):
+def create_access_token(data: dict, admin = False):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(tz = timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+    to_encode.update({"admin": admin})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
@@ -63,7 +60,13 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        temp = payload.get("exp")
         if username is None:
+            raise credentials_exception
+        if temp is None:
+            raise credentials_exception
+        exp = datetime.fromtimestamp(temp, tz=timezone.utc)
+        if exp < datetime.now(tz = timezone.utc):
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -74,7 +77,7 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     return user
 
 @loginrouter.post("/register")
-def register(user: User, db = Depends(get_db)):
+def register(user: UserCreate, db = Depends(get_db)):
     users = db["users"]
     if users.find_one({"username": user.username}):
         raise HTTPException(status_code=400, detail="User already exists")
@@ -92,10 +95,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)
     token = create_access_token({"sub": user["username"]})
     return {"access_token": token, "token_type": "bearer"}
 
-@loginrouter.get("/test")
-def read_users_me(user = Depends(get_user)):
-    return {"username": user["username"]}
-
-@loginrouter.get("/personalinfo")
-async def get_info(user = Depends(get_user), db = Depends(get_db)):
+@loginrouter.get("/userinfo")
+async def get_info(user = Depends(get_user)):
     return user

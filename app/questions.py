@@ -1,21 +1,18 @@
-from .login import get_db
+from .login import get_db, get_user
 from fastapi import APIRouter
 from fastapi import Depends, FastAPI, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
 
-questionsrouter = APIRouter()
+questionsrouter = APIRouter(tags = ["questions"])
 
-@questionsrouter.get("/questions")
-async def get_questions(test = True, db = Depends(get_db)):
-    collection_name = "testquestions" if test else "questions"
-    questions = db[collection_name]
-    
-    doc = questions.find_one({}, {"_id": 0})  # get the first document, omit _id
+@questionsrouter.get("/getquestions")
+async def get_questions(db = Depends(get_db)):
+    questions = db["questions"]
+    doc = questions.find_one({}, {"_id": 0})
     if doc and "questions" in doc:
-        return {"questions": doc["questions"]}
-    
-    return {"questions": []}
+        return doc["questions"]
+    raise HTTPException(status_code=404, detail="Database empty")
 
 @questionsrouter.get("/submitquestions")
 async def submit(answers):
