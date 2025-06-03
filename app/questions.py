@@ -64,7 +64,7 @@ async def submit_answers(submission: SubmissionRequest, db = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to submit answers: {str(e)}")
 
 @questionsrouter.get("/submitquestions")
-async def submit(answers):
+async def submit(answers, user = Depends(get_user),):
     filename = "results"+(datetime.now().strftime("%m%d%Y_%H%M%S"))
     with open ("answers/"+filename, 'w') as f:
         json.dump(answers, f)
