@@ -3,17 +3,15 @@ import azure.cognitiveservices.speech as speechsdk
 # STT setup
 STT_API_KEY = "tCg1r8HgLWvXMOPcjSz2EtBsScO5ppM83ckzhaNaH8L3GWaVGzavJQQJ99BCACYeBjFXJ3w3AAAYACOGeF1U"
 STT_SERVER_REGION = "eastus"
-AZURE_SUBSCRIPTION_KEY = "YOUR_KEY_HERE"  # Replace with your actual key
 AZURE_REGION = "eastasia"  # Best region for Cantonese
-SPEECH_LANGUAGE = "zh-HK"  # Cantonese (Hong Kong)
-VOICE_NAME = "zh-HK-HiuGaaiNeural"  # Best female Cantonese voice
+SPEECH_LANGUAGE = "en-US"  # Cantonese (Hong Kong)
+VOICE_NAME = "en-US-AriaNeural"  # Best female Cantonese voice
 
 # Audio settings
 SAMPLE_RATE = 16000  # Hz
 CHANNELS = 1  # Mono
 
 class AzureSpeechService:
-    """Azure Speech Service wrapper for Cantonese TTS and STT"""
     
     def __init__(self, subscription_key=STT_API_KEY, region=STT_SERVER_REGION):
         """Initialize speech service with Azure credentials"""

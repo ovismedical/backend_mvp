@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-05-18T00:49:53.482428",
+  "patient_id": "q",
+  "symptoms": {
+    "fatigue": {
+      "frequency_rating": 0,
+      "severity_rating": 0,
+      "key_indicators": [],
+      "additional_notes": "No report of fatigue."
+    },
+    "lack_of_appetite": {
+      "frequency_rating": 0,
+      "severity_rating": 0,
+      "key_indicators": [],
+      "additional_notes": "No report of lack of appetite."
+    },
+    "nausea": {
+      "frequency_rating": 0,
+      "severity_rating": 0,
+      "key_indicators": [],
+      "additional_notes": "No report of nausea."
+    },
+    "cough": {
+      "frequency_rating": 0,
+      "severity_rating": 0,
+      "key_indicators": [],
+      "additional_notes": "No report of cough."
+    },
+    "pain": {
+      "frequency_rating": 0,
+      "severity_rating": 0,
+      "location": "N/A",
+      "key_indicators": [],
+      "additional_notes": "No report of pain."
+    }
+  },
+  "flag_for_oncologist": false,
+  "oncologist_notification_level": "none",
+  "treatment_status": "undergoing_treatment"
+}

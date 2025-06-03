@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OnCallLogist Symptom Assessment</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OnCallLogist</h1>
+            <div class="patient-info">
+                <p>Patient ID: <span id="patient-id"></span></p>
+                <p>Date: <span id="assessment-date"></span></p>
+                <p>Status: <span id="treatment-status"></span></p>
+            </div>
+        </header>
+        
+        <div class="notification-banner" id="notification-banner">
+            <div class="notification-content">
+                <p><strong>Notification: <span id="notification-level"></span></strong></p>
+                <p id="flag-reason"></p>
+            </div>
+        </div>
+        
+        <main>
+            <div class="symptoms-container">
+                <h2>Symptom Assessment</h2>
+                <div class="symptom-cards" id="symptom-cards">
+                    <!-- Symptom cards will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <div class="notes-section">
+                <h2>Additional Notes</h2>
+                <div class="notes-box">
+                    <h3>Mood Assessment</h3>
+                    <p id="mood-assessment"></p>
+                </div>
+                <div class="notes-box">
+                    <h3>Conversation Notes</h3>
+                    <p id="conversation-notes"></p>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>OnCallLogist &copy; 2025</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

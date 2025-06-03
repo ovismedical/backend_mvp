@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeleNurse Testing Interface</title>
+    <link rel="stylesheet" href="/styles.css">
+    <!-- Use development versions of React for better error messages -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="root">
+        <!-- Loading indicator in case of slow JS loading -->
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+            <h2>Loading TeleNurse Testing Interface...</h2>
+            <p>If this message persists, please check console for errors (F12)</p>
+        </div>
+    </div>
+    <!-- Use defer to ensure the DOM is ready -->
+    <script type="text/babel" src="/app.js" defer></script>
+    
+    <!-- Fallback script in case main script fails -->
+    <script>
+        window.addEventListener('load', function() {
+            // Check if React rendered anything after 3 seconds
+            setTimeout(function() {
+                const root = document.getElementById('root');
+                if (root && root.children.length === 1 && root.children[0].textContent.includes('Loading')) {
+                    console.error('React app failed to render. Showing fallback content.');
+                    root.innerHTML = `
+                        <div style="max-width: 800px; margin: 40px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <h2 style="color: #0066cc; margin-bottom: 20px;">TeleNurse Testing Interface</h2>
+                            <div style="padding: 15px; background: #ffebe6; border-left: 4px solid #dc3545; margin-bottom: 20px;">
+                                <h3 style="margin-top: 0; color: #dc3545;">Error Loading Interface</h3>
+                                <p>The interface failed to load properly. This might be due to:</p>
+                                <ul>
+                                    <li>JavaScript being disabled</li>
+                                    <li>Network connectivity issues with CDN resources</li>
+                                    <li>JavaScript errors in the application code</li>
+                                </ul>
+                                <p>Please check your browser console (F12) for more details.</p>
+                            </div>
+                            <p>You can try:</p>
+                            <ul>
+                                <li>Refreshing the page</li>
+                                <li>Using a different browser</li>
+                                <li>Checking your internet connection</li>
+                            </ul>
+                            <div style="margin-top: 20px;">
+                                <button onclick="window.location.reload()" style="background: #0066cc; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                                    Refresh Page
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
