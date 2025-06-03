@@ -4,6 +4,9 @@ import os
 import json
 import sys
 
+# Define the assessment records directory
+ASSESSMENT_DIR = "assessment_records"
+
 # Create a directory for static files if it doesn't exist
 if not os.path.exists('static'):
     os.makedirs('static')
@@ -700,8 +703,8 @@ class JSONViewerHandler(SimpleHTTPRequestHandler):
         # Handle JSON file listing request
         if self.path == '/list-json-files':
             try:
-                # Get all JSON files in the current directory
-                json_files = [f for f in os.listdir('.') if f.endswith('.json') and 'patient_' in f]
+                # Get all JSON files from the assessment_records directory
+                json_files = [f for f in os.listdir(ASSESSMENT_DIR) if f.endswith('.json') and 'patient_' in f]
                 
                 # Send the list as JSON
                 self.send_response(200)
@@ -717,7 +720,9 @@ class JSONViewerHandler(SimpleHTTPRequestHandler):
         elif self.path.startswith('/json/'):
             filename = self.path[6:]  # Remove '/json/' prefix
             try:
-                with open(filename, 'r') as f:
+                # Look for the file in the assessment_records directory
+                filepath = os.path.join(ASSESSMENT_DIR, filename)
+                with open(filepath, 'r') as f:
                     json_data = f.read()
                 
                 self.send_response(200)
