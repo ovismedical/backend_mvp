@@ -22,19 +22,5 @@ async def submit(answers):
     return ("Answers saved at " + filename)
 
 @questionsrouter.get("/getstreak")
-def get_streak(username, db=Depends(get_db)):
-    patients = db["patients"]
-    patient = patients.find_one({"username": username}, {"_id": 0, "password": 0})
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    
-    today = datetime.now(timezone.utc).date()
-    last_check_in = datetime.strptime(patient.get("last_completion"), "%m/%d/%Y").date()
-
-    if last_check_in == today:
-        return patient.get("streak")
-    elif last_check_in == today - timedelta(days=1):
-        return patient.get("streak")
-    else:
-        patients.update_one({"username": username}, {"$set": {"streak": 0}})
-        return 0
+def get_streak(user = Depends(get_user), db=Depends(get_db)):
+    return ({"streak" : user["streak"]})
