@@ -38,7 +38,7 @@ active_sessions: Dict[str, Dict] = {}
 @florencerouter.on_event("startup")
 async def startup_florence():
     """Initialize Florence AI system on startup"""
-    api_key = "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"
+    api_key = "nuh uh"
     if api_key:
         success = await initialize_florence(api_key)
         if success:
