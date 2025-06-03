@@ -83,9 +83,10 @@ def register(user: UserCreate, db = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already exists")
     hashed = hash_password(user.password)
     user.password = hashed
-    user.update({"streak" : 0})
-    user.update({"last_answer" : -1})
-    users.insert_one(user.dict())
+    userdict = user.dict()
+    userdict.update({"streak" : 0})
+    userdict.update({"last_answer" : -1})
+    users.insert_one(userdict)
     return {"msg": "User created"}
 
 @loginrouter.post("/token")
