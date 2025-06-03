@@ -7,7 +7,7 @@ adminrouter = APIRouter(prefix = "/admin", tags = ["admin"])
 @adminrouter.get("/patients")
 def get_patients_by_doctor(doctor, db=Depends(get_db)):
     users = db["users"]
-    patients = list(users.find({"doctor" : doctor}, {"_id": 0}))
+    patients = list(users.find({"doctor" : doctor}, {"_id": 0, "password": 0}))
     return {"patients": patients}
 
 @adminrouter.get("/answers")

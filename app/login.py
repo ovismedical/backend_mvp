@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
+# Load .env from current directory
 load_dotenv()
 
 loginrouter = APIRouter(tags = ["login"])
@@ -82,11 +83,14 @@ def register(user: UserCreate, db = Depends(get_db)):
     if users.find_one({"username": user.username}):
         raise HTTPException(status_code=400, detail="User already exists")
     hashed = hash_password(user.password)
-    user.password = hashed
-    userdict = user.dict()
-    userdict.update({"streak" : 0})
-    userdict.update({"last_answer" : -1})
-    users.insert_one(userdict)
+    
+    # Convert to dict and add additional fields
+    user_dict = user.dict()
+    user_dict["password"] = hashed
+    user_dict["streak"] = 0
+    user_dict["last_answer"] = -1
+    
+    users.insert_one(user_dict)
     return {"msg": "User created"}
 
 @loginrouter.post("/token")
