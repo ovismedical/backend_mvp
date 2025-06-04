@@ -1,3 +1,4 @@
 .env
 __pychache__/
 *.pyc
+app/.env
