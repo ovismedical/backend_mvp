@@ -17,7 +17,6 @@ async def get_questions(db = Depends(get_db)):
     doc = questions.find_one({}, {"_id": 0})
     if doc and "questions" in doc:
         return doc
-        return doc
     raise HTTPException(status_code=404, detail="Database empty")
 
 @questionsrouter.post("/submit")
