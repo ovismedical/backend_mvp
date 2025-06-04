@@ -17,7 +17,6 @@ async def get_questions(db = Depends(get_db)):
     doc = questions.find_one({}, {"_id": 0})
     if doc and "questions" in doc:
         return doc
-        return doc
     raise HTTPException(status_code=404, detail="Database empty")
 
 @questionsrouter.post("/submit")
@@ -72,30 +71,5 @@ async def submit(answers, user = Depends(get_user),):
     return ("Answers saved at " + filename)
 
 @questionsrouter.get("/getstreak")
-def get_streak(username, db=Depends(get_db)):
-    users = db["users"]
-    user = users.find_one({"username": username}, {"_id": 0, "password": 0})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    today = datetime.now(timezone.utc).date()
-    last_completion = user.get("last_completion")
-    
-    if not last_completion:
-        # If no last_completion date, streak is 0
-        return 0
-    
-    try:
-        last_check_in = datetime.strptime(last_completion, "%m/%d/%Y").date()
-    except (ValueError, TypeError):
-        # If invalid date format, reset streak
-        users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return 0
-
-    if last_check_in == today:
-        return user.get("streak", 0)
-    elif last_check_in == today - timedelta(days=1):
-        return user.get("streak", 0)
-    else:
-        users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return 0
+def get_streak(user = Depends(get_user), db=Depends(get_db)):
+    return {"streak": user["streak"]}
