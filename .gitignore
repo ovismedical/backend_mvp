@@ -1,0 +1,14 @@
+# Backend specific environment files
+.env
+app/.env
+
+# Python cache (keep for backend-specific ignoring)
+__pycache__/
+*.pyc
+
+# Backend specific dependencies and data
+poetry.lock
+create_dummy_*.py
+*.db
+view_database.py
+json_history_viewer.py
