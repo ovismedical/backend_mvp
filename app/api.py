@@ -342,8 +342,17 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
                     
                     if symptoms:  # Only process if symptoms exist
                         for symptom_name, symptom_data in symptoms.items():
-                            severity = symptom_data.get("severity_rating", 0)
-                            frequency = symptom_data.get("frequency_rating", 0)
+                            # Handle legacy data where symptom_data might be a string
+                            if isinstance(symptom_data, str):
+                                # Skip string data - can't extract meaningful severity
+                                continue
+                            elif isinstance(symptom_data, dict):
+                                severity = symptom_data.get("severity_rating", 0)
+                                frequency = symptom_data.get("frequency_rating", 0)
+                            else:
+                                # Unknown data type, skip
+                                continue
+                                
                             if severity > 0:  # Only count non-zero severities
                                 daily_severities.append(severity)
                                 day_symptoms[symptom_name].append(severity)
@@ -359,7 +368,10 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
                     if assessment.get("flag_for_oncologist", False):
                         total_alerts += 1
                 
-                avg_severity = statistics.mean(daily_severities) if daily_severities else 0
+                try:
+                    avg_severity = statistics.mean(daily_severities) if daily_severities and len(daily_severities) > 0 else 0
+                except (statistics.StatisticsError, ValueError):
+                    avg_severity = 0
                 
                 daily_data.append({
                     "date": day_str,
@@ -383,40 +395,49 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
         highest_avg_severity = 0
         
         for symptom, severities in avg_severity_by_symptom.items():
-            if severities:  # Only process if we have data
-                avg_sev = statistics.mean(severities)
-                if avg_sev > highest_avg_severity:
-                    highest_avg_severity = avg_sev
-                    most_concerning_symptom = {
-                        "name": symptom.replace('_', ' ').title(),
-                        "avgSeverity": round(avg_sev, 1)
-                    }
+            if severities and len(severities) > 0:  # Double check we have data
+                try:
+                    avg_sev = statistics.mean(severities)
+                    if avg_sev > highest_avg_severity:
+                        highest_avg_severity = avg_sev
+                        most_concerning_symptom = {
+                            "name": symptom.replace('_', ' ').title(),
+                            "avgSeverity": round(avg_sev, 1)
+                        }
+                except (statistics.StatisticsError, ValueError) as e:
+                    print(f"Error calculating mean for symptom {symptom}: {e}")
+                    continue
         
         # Calculate average severity by symptom for chart
         final_avg_severity = {}
         for symptom, severities in avg_severity_by_symptom.items():
-            if severities:  # Only process if we have data
-                final_avg_severity[symptom] = round(statistics.mean(severities), 1)
+            if severities and len(severities) > 0:  # Double check we have data
+                try:
+                    final_avg_severity[symptom] = round(statistics.mean(severities), 1)
+                except (statistics.StatisticsError, ValueError) as e:
+                    print(f"Error calculating mean for symptom {symptom}: {e}")
+                    final_avg_severity[symptom] = 0
         
         # Determine overall trend
+        overall_trend = "Insufficient Data"
         if len(daily_data) >= 2:
             recent_data = [d["avgSeverity"] for d in daily_data[-3:] if d["hasData"] and d["avgSeverity"] > 0]
             earlier_data = [d["avgSeverity"] for d in daily_data[:3] if d["hasData"] and d["avgSeverity"] > 0]
             
-            if recent_data and earlier_data:
-                recent_avg = statistics.mean(recent_data)
-                earlier_avg = statistics.mean(earlier_data)
-                
-                if recent_avg < earlier_avg - 0.5:
-                    overall_trend = "Improving"
-                elif recent_avg > earlier_avg + 0.5:
-                    overall_trend = "Concerning"
-                else:
-                    overall_trend = "Stable"
-            else:
-                overall_trend = "Insufficient Data"
-        else:
-            overall_trend = "Insufficient Data"
+            if recent_data and earlier_data and len(recent_data) > 0 and len(earlier_data) > 0:
+                try:
+                    recent_avg = statistics.mean(recent_data)
+                    earlier_avg = statistics.mean(earlier_data)
+                    
+                    if recent_avg < earlier_avg - 0.5:
+                        overall_trend = "Improving"
+                    elif recent_avg > earlier_avg + 0.5:
+                        overall_trend = "Concerning"
+                    else:
+                        overall_trend = "Stable"
+                except (statistics.StatisticsError, ValueError) as e:
+                    print(f"Error calculating trend: {e}")
+                    overall_trend = "Insufficient Data"
         
         # Generate insights (context-aware for different weeks)
         week_context = "this week" if week_offset == 0 else week_label.lower()
@@ -592,7 +613,17 @@ async def get_monthly_analytics(month_offset: int = 0, user = Depends(get_user),
                     daily_severities = []
                     for symptom_name, symptom_data in symptoms.items():
                         available_symptoms.add(symptom_name)
-                        severity = symptom_data.get("severity_rating", 0)
+                        
+                        # Handle legacy data where symptom_data might be a string
+                        if isinstance(symptom_data, str):
+                            # Skip string data - can't extract meaningful severity
+                            continue
+                        elif isinstance(symptom_data, dict):
+                            severity = symptom_data.get("severity_rating", 0)
+                        else:
+                            # Unknown data type, skip
+                            continue
+                            
                         daily_severities.append(severity)
                         
                         if symptom_name not in symptoms_by_day:
