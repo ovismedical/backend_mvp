@@ -30,9 +30,8 @@ from .florence_utils import (
 class FlorenceAI:
     def __init__(self):
         self.client = None
-        self.model = "gpt-3.5-turbo"
-        self.max_tokens = 500
-        self.temperature = 0.7
+        self.model = "gpt-4"
+        self.temperature = 0.8
         self.conversation_state = "starting"  # starting, assessing, completing
         self.assessed_symptoms = set()
         self.system_prompt = None  # Will be loaded when needed
@@ -141,7 +140,6 @@ class FlorenceAI:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=conversation_history,
-                max_tokens=self.max_tokens,
                 temperature=self.temperature,
                 stream=False
             )
