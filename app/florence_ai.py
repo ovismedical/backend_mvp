@@ -40,11 +40,13 @@ class FlorenceAI:
     def _get_system_prompt(self) -> str:
         """Get the system prompt, loading it if necessary"""
         if self.system_prompt is None:
+            print(f"🔄 Loading system prompt for language: {self.language}")
             self.system_prompt = load_florence_system_prompt(self.language)
         return self.system_prompt
         
     def set_language(self, language: str):
         """Set the language for the conversation"""
+        print(f"🌐 Setting language to: {language}")
         self.language = language
         self.system_prompt = None  # Reset system prompt to force reload with new language
         
@@ -195,11 +197,10 @@ class FlorenceAI:
             
             # Make API call with function calling
             completion = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=ai_history,
-                functions=[ASSESSMENT_FUNCTION_SCHEMA],
-                function_call={"name": "record_symptom_assessment"},
-                temperature=0.1  # Lower temperature for more consistent assessments
+                temperature=self.temperature,
+                stream=False
             )
             
             # Parse the function call response

@@ -103,6 +103,8 @@ async def start_florence_session(
         # Create unique session ID
         session_id = f"{user['username']}_{int(time.time())}"
         
+        print(f"🎯 Starting new session with language: {request.language}")
+        
         # Get API key
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -120,6 +122,7 @@ async def start_florence_session(
             )
         
         # Set language for Florence
+        print(f"🌐 Setting Florence language to: {request.language}")
         florence_ai.set_language(request.language)
         
         # Start conversation with Florence

@@ -152,8 +152,10 @@ def load_florence_system_prompt(language: str = "en") -> str:
         # Select prompt file based on language
         if language == "zh-HK":
             prompt_file_path = os.path.join(current_dir, "prompt_canto.txt")
+            print(f"🔤 Loading Cantonese prompt from {prompt_file_path}")
         else:
             prompt_file_path = os.path.join(current_dir, "prompt_eng.txt")
+            print(f"🔤 Loading English prompt from {prompt_file_path}")
         
         with open(prompt_file_path, 'r', encoding='utf-8') as file:
             prompt = file.read().strip()
