@@ -35,12 +35,18 @@ class FlorenceAI:
         self.conversation_state = "starting"  # starting, assessing, completing
         self.assessed_symptoms = set()
         self.system_prompt = None  # Will be loaded when needed
+        self.language = "en"  # Default language
         
     def _get_system_prompt(self) -> str:
         """Get the system prompt, loading it if necessary"""
         if self.system_prompt is None:
-            self.system_prompt = load_florence_system_prompt()
+            self.system_prompt = load_florence_system_prompt(self.language)
         return self.system_prompt
+        
+    def set_language(self, language: str):
+        """Set the language for the conversation"""
+        self.language = language
+        self.system_prompt = None  # Reset system prompt to force reload with new language
         
     def initialize(self, api_key: str = None):
         """Initialize OpenAI client"""

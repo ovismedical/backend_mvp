@@ -143,12 +143,17 @@ ASSESSMENT_FUNCTION_SCHEMA = {
     }
 }
 
-def load_florence_system_prompt() -> str:
-    """Load Florence system prompt from prompt.txt file"""
+def load_florence_system_prompt(language: str = "en") -> str:
+    """Load Florence system prompt from prompt file based on language"""
     try:
         # Get the directory where this module is located
         current_dir = os.path.dirname(__file__)
-        prompt_file_path = os.path.join(current_dir, "prompt.txt")
+        
+        # Select prompt file based on language
+        if language == "zh":
+            prompt_file_path = os.path.join(current_dir, "prompt_canto.txt")
+        else:
+            prompt_file_path = os.path.join(current_dir, "prompt_eng.txt")
         
         with open(prompt_file_path, 'r', encoding='utf-8') as file:
             prompt = file.read().strip()
@@ -162,11 +167,11 @@ def load_florence_system_prompt() -> str:
     except FileNotFoundError:
         print(f"❌ Prompt file not found at {prompt_file_path}")
         # Fallback prompt
-        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling."
+        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling today."
     except Exception as e:
         print(f"❌ Error loading prompt file: {e}")
         # Fallback prompt
-        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling."
+        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling today."
 
 def create_timestamp() -> str:
     """Create a standardized timestamp string"""

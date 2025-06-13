@@ -12,7 +12,8 @@ from .florence_ai import (
     initialize_florence,
     start_florence_conversation,
     send_message_to_florence,
-    get_florence_structured_assessment
+    get_florence_structured_assessment,
+    florence_ai
 )
 from .florence_utils import (
     create_timestamp,
@@ -68,6 +69,25 @@ async def start_florence_session(
     try:
         # Create unique session ID
         session_id = f"{user['username']}_{int(time.time())}"
+        
+        # Get API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="OpenAI API key not found"
+            )
+            
+        # Always reinitialize Florence when starting a new session
+        # This ensures a clean state and proper language loading
+        if not await initialize_florence(api_key):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to initialize Florence AI"
+            )
+        
+        # Set language for Florence
+        florence_ai.set_language(request.language)
         
         # Start conversation with Florence
         patient_name = user.get('full_name', user['username'])
