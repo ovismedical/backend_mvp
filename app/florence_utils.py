@@ -150,7 +150,7 @@ def load_florence_system_prompt(language: str = "en") -> str:
         current_dir = os.path.dirname(__file__)
         
         # Select prompt file based on language
-        if language == "zh":
+        if language == "zh-HK":
             prompt_file_path = os.path.join(current_dir, "prompt_canto.txt")
         else:
             prompt_file_path = os.path.join(current_dir, "prompt_eng.txt")

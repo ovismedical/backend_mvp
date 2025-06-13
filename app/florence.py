@@ -44,6 +44,30 @@ class SessionResponse(BaseModel):
 
 # Global session storage (in production, this should be Redis/database)
 active_sessions: Dict[str, Dict] = {}
+SESSION_EXPIRY = 30 * 60  # 30 minutes in seconds
+
+def cleanup_expired_sessions():
+    """Remove expired sessions from active_sessions"""
+    current_time = datetime.now(timezone.utc)
+    expired_sessions = []
+    
+    for session_id, session in active_sessions.items():
+        try:
+            # Parse the ISO timestamp string to datetime
+            created_at = datetime.fromisoformat(session["created_at"].replace('Z', '+00:00'))
+            # Calculate time difference in seconds
+            time_diff = (current_time - created_at).total_seconds()
+            
+            if time_diff > SESSION_EXPIRY:
+                expired_sessions.append(session_id)
+        except (ValueError, KeyError) as e:
+            print(f"Error processing session {session_id}: {e}")
+            expired_sessions.append(session_id)
+    
+    # Remove expired sessions
+    for session_id in expired_sessions:
+        del active_sessions[session_id]
+        print(f"Removed expired session: {session_id}")
 
 # Initialize Florence AI on startup
 @florencerouter.on_event("startup")
@@ -58,6 +82,15 @@ async def startup_florence():
             print("❌ Florence AI initialization failed")
     else:
         print("⚠️ No OpenAI API key found - Florence will use fallback responses")
+    
+    # Start cleanup task
+    asyncio.create_task(periodic_cleanup())
+
+async def periodic_cleanup():
+    """Periodically clean up expired sessions"""
+    while True:
+        cleanup_expired_sessions()
+        await asyncio.sleep(60)  # Check every minute
 
 @florencerouter.post("/start_session", response_model=SessionResponse)
 async def start_florence_session(
@@ -225,91 +258,59 @@ async def send_message_to_florence_endpoint(
 @florencerouter.post("/finish_session/{session_id}")
 async def finish_florence_session(
     session_id: str,
-    user = Depends(get_user),
-    db = Depends(get_db)
+    user: Dict = Depends(get_user)
 ):
-    """Finish Florence session and save structured assessment to database"""
+    """Finish a Florence session and save the assessment"""
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+        
     session = active_sessions[session_id]
     
-    # Verify user owns this session using shared utility
+    # Validate session access
     if not validate_session_access(session, user["username"]):
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
     
     try:
-        # Generate structured assessment if AI is available
-        structured_assessment = None
-        if session.get("ai_available", False):
-            try:
-                # Get patient ID and treatment status from session
-                patient_id = session["user_id"]
-                treatment_status = session.get("treatment_status", "undergoing_treatment")
-                
-                assessment_result = await get_florence_structured_assessment(
-                    session["conversation_history"], 
-                    patient_id, 
-                    treatment_status
-                )
-                structured_assessment = assessment_result.get("structured_assessment")
-                
-                # Update session with oncologist notification info
-                if structured_assessment:
-                    session["oncologist_notification_level"] = structured_assessment.get("oncologist_notification_level", "none")
-                    session["flag_for_oncologist"] = structured_assessment.get("flag_for_oncologist", False)
-                
-            except Exception as e:
-                print(f"Error generating structured assessment: {e}")
-                # Create a minimal fallback assessment
-                structured_assessment = {
-                    "timestamp": create_timestamp(),
-                    "patient_id": session["user_id"],
-                    "symptoms": {
-                        "cough": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                        "nausea": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                        "lack_of_appetite": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                        "fatigue": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                        "pain": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []}
-                    },
-                    "flag_for_oncologist": False,
-                    "oncologist_notification_level": "none",
-                    "treatment_status": session.get("treatment_status", "undergoing_treatment"),
-                    "mood_assessment": "Assessment completed through conversation with Florence",
-                    "conversation_notes": f"Symptoms discussed: {session.get('symptoms_assessed', [])}"
-                }
+        # Check if session has expired
+        current_time = datetime.now(timezone.utc)
+        created_at = datetime.fromisoformat(session["created_at"].replace('Z', '+00:00'))
+        time_diff = (current_time - created_at).total_seconds()
+        
+        if time_diff > SESSION_EXPIRY:
+            del active_sessions[session_id]
+            raise HTTPException(status_code=410, detail="Session has expired")
+        
+        # Generate structured assessment
+        assessment = await florence_ai.generate_structured_assessment(
+            session["conversation_history"],
+            user["username"],
+            session.get("treatment_status", "undergoing_treatment")
+        )
+        
+        # Create assessment record
+        assessment_record = create_assessment_record(session, assessment)
+        
+        # Save to database
+        try:
+            db = get_db()
+            db.assessments.insert_one(assessment_record)
+            print(f"✅ Saved assessment for session {session_id}")
+        except Exception as e:
+            print(f"❌ Failed to save assessment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to save assessment")
         
         # Mark session as completed
         session["status"] = "completed"
         session["completed_at"] = create_timestamp()
-        session["structured_assessment"] = structured_assessment
-        
-        # Save to MongoDB using standardized record format
-        florence_collection = db["florence_assessments"]
-        assessment_record = create_assessment_record(session, structured_assessment)
-        
-        result = florence_collection.insert_one(assessment_record)
-        
-        # Clean up session from memory
-        del active_sessions[session_id]
         
         return {
-            "success": True,
-            "message": "Florence session completed and saved",
-            "assessment_id": str(result.inserted_id),
-            "conversation_length": len(session["conversation_history"]),
-            "symptoms_assessed": session.get("symptoms_assessed", []),
-            "structured_assessment": structured_assessment,
-            "oncologist_notification_level": session.get("oncologist_notification_level", "none"),
-            "flag_for_oncologist": session.get("flag_for_oncologist", False)
+            "message": "Session completed successfully",
+            "assessment": assessment
         }
         
     except Exception as e:
-        print(f"Error finishing session: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to finish session: {str(e)}"
-        )
+        print(f"❌ Error finishing session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @florencerouter.get("/test")
 async def test_florence_endpoint():
