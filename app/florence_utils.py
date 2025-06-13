@@ -147,7 +147,7 @@ def load_florence_system_prompt(language: str = "en") -> str:
     """Load Florence system prompt from prompt file based on language"""
     try:
         # Get the directory where this module is located
-        current_dir = os.path.dirname(__file__)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         
         # Select prompt file based on language
         if language == "zh-HK":
