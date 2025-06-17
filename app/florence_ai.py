@@ -15,6 +15,7 @@ from .florence_utils import (
     TARGET_SYMPTOMS,
     PAIN_KEYWORDS,
     ASSESSMENT_FUNCTION_SCHEMA,
+    ASSESSMENT_FUNCTION_SCHEMA_ZH,
     create_timestamp,
     generate_fallback_response,
     update_symptoms_from_text,
@@ -40,13 +41,11 @@ class FlorenceAI:
     def _get_system_prompt(self) -> str:
         """Get the system prompt, loading it if necessary"""
         if self.system_prompt is None:
-            print(f"🔄 Loading system prompt for language: {self.language}")
             self.system_prompt = load_florence_system_prompt(self.language)
         return self.system_prompt
         
     def set_language(self, language: str):
         """Set the language for the conversation"""
-        print(f"🌐 Setting language to: {language}")
         self.language = language
         self.system_prompt = None  # Reset system prompt to force reload with new language
         
@@ -168,14 +167,43 @@ class FlorenceAI:
         # Update conversation state using shared utility
         self.conversation_state = determine_conversation_state(self.assessed_symptoms)
     
-    async def generate_structured_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str = "undergoing_treatment") -> Dict[str, Any]:
+    async def generate_structured_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str = "undergoing_treatment", session_language: str = "en") -> Dict[str, Any]:
         """Generate a structured assessment using OpenAI function calling"""
         if not self.client:
             return {"error": "AI system not initialized"}
         
         try:
-            # Create assessment prompt
-            assessment_prompt = f"""
+            # Use the session language setting to determine report language
+            is_cantonese_report = session_language == "zh-HK"
+            
+            print(f"🔍 Session language: {session_language}, Using Cantonese report: {is_cantonese_report}")
+            
+            # Create assessment prompt based on selected session language
+            if is_cantonese_report:
+                # Translate treatment status to Cantonese
+                treatment_status_zh = "正在接受治療" if treatment_status == "undergoing_treatment" else "康復期"
+                
+                # Cantonese assessment prompt
+                assessment_prompt = f"""
+根據上面與病人 {patient_id} 的對話，請生成一份全面的結構化評估。
+
+病人目前狀況：{treatment_status_zh}
+
+對於每個症狀（咳嗽、噁心、食慾不振、疲勞、疼痛），請提供：
+- 頻率評級（1-5 級）：症狀發生的頻率
+- 嚴重程度評級（1-5 級）：症狀的嚴重程度
+- 關鍵指標：病人的直接引述或觀察
+- 附加註記：任何相關的背景資訊
+
+如果提到疼痛，也請包括位置。
+
+評估病人的情緒和整體狀況，並確定是否需要通知腫瘤科醫生。
+
+請使用提供的結構化格式返回評估結果，並確保所有文字內容都用繁體中文撰寫。
+                """
+            else:
+                # English assessment prompt
+                assessment_prompt = f"""
             Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment.
             
             The patient is currently: {treatment_status}
@@ -195,17 +223,31 @@ class FlorenceAI:
             ai_history = format_conversation_history_for_ai(conversation_history, include_system_prompt=False)
             ai_history.append({"role": "user", "content": assessment_prompt})
             
+            print(f"🔍 Making structured assessment API call with function calling...")
+            print(f"📝 Conversation length: {len(conversation_history)} messages")
+            print(f"👤 Patient ID: {patient_id}")
+            print(f"🏥 Treatment status: {treatment_status}")
+            print(f"🌐 Florence language setting: {self.language}")
+            print(f"🗣️ Report language: {'Cantonese' if is_cantonese_report else 'English'}")
+            
+            # Choose the appropriate function schema based on session language
+            function_schema = ASSESSMENT_FUNCTION_SCHEMA_ZH if is_cantonese_report else ASSESSMENT_FUNCTION_SCHEMA
+            
             # Make API call with function calling
             completion = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=ai_history,
                 temperature=self.temperature,
+                functions=[function_schema],
+                function_call={"name": "record_symptom_assessment"},
                 stream=False
             )
             
             # Parse the function call response
             if completion.choices[0].message.function_call:
+                print("✅ Got function call response from OpenAI")
                 function_args = json.loads(completion.choices[0].message.function_call.arguments)
+                print(f"📊 Function args received: {json.dumps(function_args, indent=2)}")
                 
                 # Add timestamp and patient_id if not provided
                 function_args["timestamp"] = create_timestamp()
@@ -220,6 +262,7 @@ class FlorenceAI:
                 if should_flag:
                     function_args["flag_reason"] = flag_reason
                 
+                print(f"🏁 Final structured assessment created with {len(symptoms)} symptoms")
                 return {
                     "structured_assessment": function_args,
                     "symptoms_assessed": list(self.assessed_symptoms),
@@ -227,11 +270,12 @@ class FlorenceAI:
                     "conversation_length": len(conversation_history)
                 }
             else:
+                print("❌ No function call in OpenAI response, using fallback")
                 # Fallback if function calling fails
                 return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
             
         except Exception as e:
-            print(f"Error generating structured assessment: {e}")
+            print(f"❌ Error generating structured assessment: {e}")
             return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
     
     async def _generate_fallback_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str) -> Dict[str, Any]:

@@ -103,8 +103,6 @@ async def start_florence_session(
         # Create unique session ID
         session_id = f"{user['username']}_{int(time.time())}"
         
-        print(f"🎯 Starting new session with language: {request.language}")
-        
         # Get API key
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -113,16 +111,20 @@ async def start_florence_session(
                 detail="OpenAI API key not found"
             )
             
-        # Always reinitialize Florence when starting a new session
-        # This ensures a clean state and proper language loading
-        if not await initialize_florence(api_key):
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to initialize Florence AI"
-            )
+        # Check if Florence AI is initialized
+        if not florence_ai or not florence_ai.client:
+            # Only initialize if not already done
+            print(f"🔄 Initializing Florence AI for new session {session_id}")
+            if not await initialize_florence(api_key):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to initialize Florence AI"
+                )
+        else:
+            print(f"✅ Florence AI already initialized, reusing for session {session_id}")
         
         # Set language for Florence
-        print(f"🌐 Setting Florence language to: {request.language}")
+        print(f"🌐 Setting language to: {request.language}")
         florence_ai.set_language(request.language)
         
         # Start conversation with Florence
@@ -284,19 +286,56 @@ async def finish_florence_session(
             raise HTTPException(status_code=410, detail="Session has expired")
         
         # Generate structured assessment
+        print(f"🔬 Starting assessment generation for session {session_id}")
+        print(f"📝 Conversation has {len(session['conversation_history'])} messages")
+        
+        # Ensure language is set correctly for assessment generation
+        session_language = session.get("language", "en")
+        florence_ai.set_language(session_language)
+        print(f"🌐 Set language to: {session_language}")
+        
         assessment = await florence_ai.generate_structured_assessment(
             session["conversation_history"],
             user["username"],
-            session.get("treatment_status", "undergoing_treatment")
+            session.get("treatment_status", "undergoing_treatment"),
+            session.get("language", "en")  # Pass the session language
         )
         
+        print(f"🔍 Assessment generation result: {type(assessment)}")
+        if assessment:
+            print(f"📋 Assessment keys: {list(assessment.keys())}")
+        
+        # Extract the structured assessment from the response
+        structured_assessment = assessment.get("structured_assessment") if assessment else None
+        
+        if structured_assessment:
+            print(f"✅ Successfully extracted structured assessment")
+            print(f"🔬 Structured assessment type: {type(structured_assessment)}")
+            if isinstance(structured_assessment, dict) and "symptoms" in structured_assessment:
+                symptoms = structured_assessment["symptoms"]
+                print(f"📊 Found {len(symptoms)} symptoms in assessment")
+                for symptom_name, symptom_data in symptoms.items():
+                    freq = symptom_data.get("frequency_rating", "N/A")
+                    sev = symptom_data.get("severity_rating", "N/A")
+                    print(f"  - {symptom_name}: frequency={freq}, severity={sev}")
+            else:
+                print(f"⚠️ Structured assessment missing symptoms or wrong format")
+        else:
+            print(f"❌ No structured assessment found in response")
+        
         # Create assessment record
-        assessment_record = create_assessment_record(session, assessment)
+        assessment_record = create_assessment_record(session, structured_assessment)
+        
+        print(f"📝 Created assessment record with keys: {list(assessment_record.keys())}")
+        if "structured_assessment" in assessment_record and assessment_record["structured_assessment"]:
+            print(f"✅ Assessment record contains structured_assessment")
+        else:
+            print(f"❌ Assessment record missing structured_assessment")
         
         # Save to database
         try:
             db = get_db()
-            db.assessments.insert_one(assessment_record)
+            db.florence_assessments.insert_one(assessment_record)
             print(f"✅ Saved assessment for session {session_id}")
         except Exception as e:
             print(f"❌ Failed to save assessment: {e}")

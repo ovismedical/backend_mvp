@@ -143,6 +143,97 @@ ASSESSMENT_FUNCTION_SCHEMA = {
     }
 }
 
+# Cantonese version of the assessment function schema
+ASSESSMENT_FUNCTION_SCHEMA_ZH = {
+    "name": "record_symptom_assessment",
+    "description": "根據對話為癌症患者記錄全面的症狀評估",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "timestamp": {
+                "type": "string",
+                "description": "評估的當前日期和時間"
+            },
+            "patient_id": {
+                "type": "string",
+                "description": "病人的唯一標識符"
+            },
+            "symptoms": {
+                "type": "object",
+                "properties": {
+                    "cough": {
+                        "type": "object",
+                        "properties": {
+                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "咳嗽頻率評級（1-5）"},
+                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "咳嗽嚴重程度評級（1-5）"},
+                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
+                            "additional_notes": {"type": "string", "description": "額外註記"}
+                        },
+                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
+                    },
+                    "nausea": {
+                        "type": "object",
+                        "properties": {
+                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "噁心頻率評級（1-5）"},
+                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "噁心嚴重程度評級（1-5）"},
+                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
+                            "additional_notes": {"type": "string", "description": "額外註記"}
+                        },
+                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
+                    },
+                    "lack_of_appetite": {
+                        "type": "object",
+                        "properties": {
+                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "食慾不振頻率評級（1-5）"},
+                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "食慾不振嚴重程度評級（1-5）"},
+                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
+                            "additional_notes": {"type": "string", "description": "額外註記"}
+                        },
+                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
+                    },
+                    "fatigue": {
+                        "type": "object",
+                        "properties": {
+                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疲勞頻率評級（1-5）"},
+                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疲勞嚴重程度評級（1-5）"},
+                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
+                            "additional_notes": {"type": "string", "description": "額外註記"}
+                        },
+                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
+                    },
+                    "pain": {
+                        "type": "object",
+                        "properties": {
+                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疼痛頻率評級（1-5）"},
+                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疼痛嚴重程度評級（1-5）"},
+                            "location": {"type": "string", "description": "疼痛位置"},
+                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
+                            "additional_notes": {"type": "string", "description": "額外註記"}
+                        },
+                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
+                    }
+                },
+                "required": ["cough", "nausea", "lack_of_appetite", "fatigue", "pain"]
+            },
+            "flag_for_oncologist": {"type": "boolean", "description": "是否需要通知腫瘤科醫生"},
+            "flag_reason": {"type": "string", "description": "通知原因"},
+            "mood_assessment": {"type": "string", "description": "情緒評估"},
+            "conversation_notes": {"type": "string", "description": "對話記錄"},
+            "oncologist_notification_level": {
+                "type": "string",
+                "enum": ["none", "amber", "red"],
+                "description": "腫瘤科醫生通知級別"
+            },
+            "treatment_status": {
+                "type": "string",
+                "enum": ["undergoing_treatment", "in_remission"],
+                "description": "治療狀態"
+            }
+        },
+        "required": ["timestamp", "patient_id", "symptoms", "flag_for_oncologist", "oncologist_notification_level", "treatment_status"]
+    }
+}
+
 def load_florence_system_prompt(language: str = "en") -> str:
     """Load Florence system prompt from prompt file based on language"""
     try:
