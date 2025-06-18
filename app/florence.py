@@ -12,7 +12,17 @@ from .florence_ai import (
     initialize_florence,
     start_florence_conversation,
     send_message_to_florence,
-    get_florence_assessment
+    get_florence_structured_assessment,
+    florence_ai
+)
+from .florence_utils import (
+    create_timestamp,
+    create_conversation_message,
+    generate_fallback_response,
+    validate_session_access,
+    is_ai_available,
+    create_assessment_record,
+    create_session_response_data
 )
 
 florencerouter = APIRouter(prefix="/florence", tags=["florence"])
@@ -21,6 +31,7 @@ florencerouter = APIRouter(prefix="/florence", tags=["florence"])
 class StartSessionRequest(BaseModel):
     language: str = "en"
     input_mode: str = "keyboard"
+    treatment_status: str = "undergoing_treatment"  # New field for structured assessment
 
 class SendMessageRequest(BaseModel):
     session_id: str
@@ -33,12 +44,36 @@ class SessionResponse(BaseModel):
 
 # Global session storage (in production, this should be Redis/database)
 active_sessions: Dict[str, Dict] = {}
+SESSION_EXPIRY = 30 * 60  # 30 minutes in seconds
+
+def cleanup_expired_sessions():
+    """Remove expired sessions from active_sessions"""
+    current_time = datetime.now(timezone.utc)
+    expired_sessions = []
+    
+    for session_id, session in active_sessions.items():
+        try:
+            # Parse the ISO timestamp string to datetime
+            created_at = datetime.fromisoformat(session["created_at"].replace('Z', '+00:00'))
+            # Calculate time difference in seconds
+            time_diff = (current_time - created_at).total_seconds()
+            
+            if time_diff > SESSION_EXPIRY:
+                expired_sessions.append(session_id)
+        except (ValueError, KeyError) as e:
+            print(f"Error processing session {session_id}: {e}")
+            expired_sessions.append(session_id)
+    
+    # Remove expired sessions
+    for session_id in expired_sessions:
+        del active_sessions[session_id]
+        print(f"Removed expired session: {session_id}")
 
 # Initialize Florence AI on startup
 @florencerouter.on_event("startup")
 async def startup_florence():
     """Initialize Florence AI system on startup"""
-    api_key = "nuh uh"
+    api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
         success = await initialize_florence(api_key)
         if success:
@@ -47,6 +82,15 @@ async def startup_florence():
             print("❌ Florence AI initialization failed")
     else:
         print("⚠️ No OpenAI API key found - Florence will use fallback responses")
+    
+    # Start cleanup task
+    asyncio.create_task(periodic_cleanup())
+
+async def periodic_cleanup():
+    """Periodically clean up expired sessions"""
+    while True:
+        cleanup_expired_sessions()
+        await asyncio.sleep(60)  # Check every minute
 
 @florencerouter.post("/start_session", response_model=SessionResponse)
 async def start_florence_session(
@@ -59,44 +103,66 @@ async def start_florence_session(
         # Create unique session ID
         session_id = f"{user['username']}_{int(time.time())}"
         
+        # Get API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="OpenAI API key not found"
+            )
+            
+        # Check if Florence AI is initialized
+        if not florence_ai or not florence_ai.client:
+            # Only initialize if not already done
+            print(f"🔄 Initializing Florence AI for new session {session_id}")
+            if not await initialize_florence(api_key):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to initialize Florence AI"
+                )
+        else:
+            print(f"✅ Florence AI already initialized, reusing for session {session_id}")
+        
+        # Set language for Florence
+        print(f"🌐 Setting language to: {request.language}")
+        florence_ai.set_language(request.language)
+        
         # Start conversation with Florence
         patient_name = user.get('full_name', user['username'])
         florence_response = await start_florence_conversation(patient_name)
         
+        # Create conversation history with standardized format
         if "error" in florence_response:
             # Fallback response if AI fails
-            welcome_message = f"Hello {patient_name}! I'm Florence, your AI nurse. I'm here to chat with you about how you're feeling today. How are you doing?"
+            welcome_message = generate_fallback_response(patient_name, "welcome")
             conversation_history = [
-                {
-                    "role": "assistant",
-                    "content": welcome_message,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                create_conversation_message("assistant", welcome_message)
             ]
+            ai_available = False
         else:
             # Use AI response
             conversation_history = [
-                {
-                    "role": "assistant",
-                    "content": florence_response["response"],
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                create_conversation_message("assistant", florence_response["response"])
             ]
+            ai_available = True
         
-        # Initialize session state
+        # Initialize session state using standardized structure
         session_data = {
             "session_id": session_id,
             "user_id": user['username'],
             "user_info": user,
             "language": request.language,
             "input_mode": request.input_mode,
+            "treatment_status": request.treatment_status,  # Store treatment status
             "status": "active",
             "conversation_history": conversation_history,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "assessment_result": None,
+            "created_at": create_timestamp(),
+            "structured_assessment": None,  # Will be populated when session completes
             "florence_state": florence_response.get("conversation_state", "starting"),
             "symptoms_assessed": florence_response.get("symptoms_assessed", []),
-            "ai_available": "error" not in florence_response
+            "ai_available": ai_available,
+            "oncologist_notification_level": "none",
+            "flag_for_oncologist": False
         }
         
         # Store session
@@ -125,20 +191,12 @@ async def get_session_status(
     
     session = active_sessions[session_id]
     
-    # Verify user owns this session
-    if session["user_id"] != user["username"]:
+    # Verify user owns this session using shared utility
+    if not validate_session_access(session, user["username"]):
         raise HTTPException(status_code=403, detail="Access denied")
     
-    return {
-        "session_id": session_id,
-        "status": session["status"],
-        "conversation_history": session["conversation_history"],
-        "assessment_result": session["assessment_result"],
-        "created_at": session["created_at"],
-        "florence_state": session.get("florence_state", "starting"),
-        "symptoms_assessed": session.get("symptoms_assessed", []),
-        "ai_available": session.get("ai_available", False)
-    }
+    # Return standardized session response
+    return create_session_response_data(session)
 
 @florencerouter.post("/send_message")
 async def send_message_to_florence_endpoint(
@@ -151,20 +209,16 @@ async def send_message_to_florence_endpoint(
     
     session = active_sessions[request.session_id]
     
-    # Verify user owns this session
-    if session["user_id"] != user["username"]:
+    # Verify user owns this session using shared utility
+    if not validate_session_access(session, user["username"]):
         raise HTTPException(status_code=403, detail="Access denied")
     
     if session["status"] != "active":
         raise HTTPException(status_code=400, detail="Session is not active")
     
     try:
-        # Add user message to conversation history
-        user_message = {
-            "role": "user",
-            "content": request.message,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        # Add user message to conversation history using standardized format
+        user_message = create_conversation_message("user", request.message)
         session["conversation_history"].append(user_message)
         
         # Get Florence's response
@@ -176,23 +230,19 @@ async def send_message_to_florence_endpoint(
             )
             
             if "error" in florence_response:
-                # Fallback response
-                ai_response = "I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?"
+                # Fallback response using shared utility
+                ai_response = generate_fallback_response(user.get('full_name', user['username']), "processing_error")
             else:
                 ai_response = florence_response["response"]
                 # Update session state
                 session["florence_state"] = florence_response.get("conversation_state", "assessing")
                 session["symptoms_assessed"] = florence_response.get("symptoms_assessed", [])
         else:
-            # Fallback response when AI is not available
-            ai_response = f"Thank you for sharing that, {user['full_name']}. I understand you mentioned: '{request.message}'. Can you tell me more about how you've been feeling today?"
+            # Fallback response when AI is not available using shared utility
+            ai_response = generate_fallback_response(user.get('full_name', user['username']), "general_followup")
         
-        # Add Florence's response to conversation history
-        assistant_message = {
-            "role": "assistant", 
-            "content": ai_response,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        # Add Florence's response to conversation history using standardized format
+        assistant_message = create_conversation_message("assistant", ai_response)
         session["conversation_history"].append(assistant_message)
         
         return {
@@ -213,87 +263,107 @@ async def send_message_to_florence_endpoint(
 @florencerouter.post("/finish_session/{session_id}")
 async def finish_florence_session(
     session_id: str,
-    user = Depends(get_user),
-    db = Depends(get_db)
+    user: Dict = Depends(get_user)
 ):
-    """Finish Florence session and save assessment to database"""
+    """Finish a Florence session and save the assessment"""
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+        
     session = active_sessions[session_id]
     
-    # Verify user owns this session
-    if session["user_id"] != user["username"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # Validate session access
+    if not validate_session_access(session, user["username"]):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
     
     try:
-        # Generate assessment summary if AI is available
-        assessment_summary = None
-        if session.get("ai_available", False):
-            try:
-                summary_result = await get_florence_assessment(session["conversation_history"])
-                assessment_summary = summary_result.get("summary", {})
-            except Exception as e:
-                print(f"Error generating assessment summary: {e}")
-                assessment_summary = {
-                    "assessment_summary": "Assessment completed through conversation with Florence",
-                    "symptoms_discussed": session.get("symptoms_assessed", [])
-                }
+        # Check if session has expired
+        current_time = datetime.now(timezone.utc)
+        created_at = datetime.fromisoformat(session["created_at"].replace('Z', '+00:00'))
+        time_diff = (current_time - created_at).total_seconds()
+        
+        if time_diff > SESSION_EXPIRY:
+            del active_sessions[session_id]
+            raise HTTPException(status_code=410, detail="Session has expired")
+        
+        # Generate structured assessment
+        print(f"🔬 Starting assessment generation for session {session_id}")
+        print(f"📝 Conversation has {len(session['conversation_history'])} messages")
+        
+        # Ensure language is set correctly for assessment generation
+        session_language = session.get("language", "en")
+        florence_ai.set_language(session_language)
+        print(f"🌐 Set language to: {session_language}")
+        
+        assessment = await florence_ai.generate_structured_assessment(
+            session["conversation_history"],
+            user["username"],
+            session.get("treatment_status", "undergoing_treatment"),
+            session.get("language", "en")  # Pass the session language
+        )
+        
+        print(f"🔍 Assessment generation result: {type(assessment)}")
+        if assessment:
+            print(f"📋 Assessment keys: {list(assessment.keys())}")
+        
+        # Extract the structured assessment from the response
+        structured_assessment = assessment.get("structured_assessment") if assessment else None
+        
+        if structured_assessment:
+            print(f"✅ Successfully extracted structured assessment")
+            print(f"🔬 Structured assessment type: {type(structured_assessment)}")
+            if isinstance(structured_assessment, dict) and "symptoms" in structured_assessment:
+                symptoms = structured_assessment["symptoms"]
+                print(f"📊 Found {len(symptoms)} symptoms in assessment")
+                for symptom_name, symptom_data in symptoms.items():
+                    freq = symptom_data.get("frequency_rating", "N/A")
+                    sev = symptom_data.get("severity_rating", "N/A")
+                    print(f"  - {symptom_name}: frequency={freq}, severity={sev}")
+            else:
+                print(f"⚠️ Structured assessment missing symptoms or wrong format")
+        else:
+            print(f"❌ No structured assessment found in response")
+        
+        # Create assessment record
+        assessment_record = create_assessment_record(session, structured_assessment)
+        
+        print(f"📝 Created assessment record with keys: {list(assessment_record.keys())}")
+        if "structured_assessment" in assessment_record and assessment_record["structured_assessment"]:
+            print(f"✅ Assessment record contains structured_assessment")
+        else:
+            print(f"❌ Assessment record missing structured_assessment")
+        
+        # Save to database
+        try:
+            db = get_db()
+            db.florence_assessments.insert_one(assessment_record)
+            print(f"✅ Saved assessment for session {session_id}")
+        except Exception as e:
+            print(f"❌ Failed to save assessment: {e}")
+            raise HTTPException(status_code=500, detail="Failed to save assessment")
         
         # Mark session as completed
         session["status"] = "completed"
-        session["completed_at"] = datetime.now(timezone.utc).isoformat()
-        session["assessment_result"] = assessment_summary
-        
-        # Save to MongoDB
-        florence_collection = db["florence_assessments"]
-        assessment_record = {
-            "session_id": session_id,
-            "user_id": session["user_id"],
-            "user_info": session["user_info"],
-            "language": session["language"],
-            "input_mode": session["input_mode"],
-            "conversation_history": session["conversation_history"],
-            "assessment_result": assessment_summary,
-            "created_at": session["created_at"],
-            "completed_at": session["completed_at"],
-            "assessment_type": "florence_conversation",
-            "florence_state": session.get("florence_state", "completed"),
-            "symptoms_assessed": session.get("symptoms_assessed", []),
-            "ai_powered": session.get("ai_available", False)
-        }
-        
-        result = florence_collection.insert_one(assessment_record)
-        
-        # Clean up session from memory
-        del active_sessions[session_id]
+        session["completed_at"] = create_timestamp()
         
         return {
-            "success": True,
-            "message": "Florence session completed and saved",
-            "assessment_id": str(result.inserted_id),
-            "conversation_length": len(session["conversation_history"]),
-            "symptoms_assessed": session.get("symptoms_assessed", []),
-            "assessment_summary": assessment_summary
+            "message": "Session completed successfully",
+            "assessment": assessment
         }
         
     except Exception as e:
-        print(f"Error finishing session: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to finish session: {str(e)}"
-        )
+        print(f"❌ Error finishing session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @florencerouter.get("/test")
 async def test_florence_endpoint():
     """Simple test endpoint to verify Florence module is working"""
-    # Test if OpenAI is available
-    openai_available = os.getenv("OPENAI_API_KEY") is not None
+    # Test if OpenAI is available using shared utility
+    openai_available = is_ai_available()
     
     return {
         "status": "ok",
         "message": "Florence module is working!",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": create_timestamp(),
         "active_sessions": len(active_sessions),
         "openai_available": openai_available,
         "ai_enabled": openai_available
