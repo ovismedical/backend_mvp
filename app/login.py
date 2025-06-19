@@ -3,12 +3,15 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
+import re
 import json 
 import os
 from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from typing import Annotated
+
 
 # Load .env from current directory
 load_dotenv()
@@ -27,9 +30,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 class UserCreate(BaseModel):
-    username: str
-    password: str
-    email: str
+    username: Annotated[str, Field(min_length = 4)]
+    password: Annotated[str, Field(min_length = 4)]
+    email: EmailStr
     full_name: str
     sex: str
     dob: str
