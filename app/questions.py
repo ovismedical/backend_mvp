@@ -63,13 +63,6 @@ async def submit_answers(submission: SubmissionRequest, db = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit answers: {str(e)}")
 
-@questionsrouter.get("/submitquestions")
-async def submit(answers, user = Depends(get_user),):
-    filename = "results"+(datetime.now().strftime("%m%d%Y_%H%M%S"))
-    with open ("answers/"+filename, 'w') as f:
-        json.dump(answers, f)
-    return ("Answers saved at " + filename)
-
 @questionsrouter.get("/getstreak")
 def get_streak(username, db=Depends(get_db)):
     users = db["users"]
