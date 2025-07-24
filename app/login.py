@@ -87,17 +87,24 @@ def gen_otp():
         otp+=(math.floor(random.random()*10)*(10**i))
     return otp
 
-def verify_code(code):
+def verify_code(code, user_dict):
     db = get_db()
     doctors = db["doctors"]
     doctor = doctors.find_one({"code":code})
-    if not doctor:
-        return("N/A")
-    return doctor["email"]
+    hospitals = db["hospitals"]
+    hospital = hospitals.find_one({"code":code})
+    if doctor:
+        user_dict.update({"isDoctor": False, "doctor": doctor["username"]})
+        return user_dict
+    if hospital:
+        user_dict.update({"isDoctor": True, "hospital": hospital["name"]})
+        return user_dict
+    raise HTTPException(status_code=400, detail="Invalid access code")
 
 @loginrouter.post("/configure_db")
 def startup(db = Depends(get_db)):
     temp_users = db["temp_users"]
+    temp_users.drop()
     temp_users.create_index(
         [("createdAt", ASCENDING)],
         expireAfterSeconds=300 
@@ -120,11 +127,7 @@ def register(user: UserCreate, db = Depends(get_db)):
 
     creation = datetime.now(tz = timezone.utc)
 
-    doctor = verify_code(user.access_code)
-    if doctor == "N/A":
-        raise HTTPException(status_code=400, detail="Invalid access code")
-    
-    user_dict.update({"doctor": doctor})
+    user_dict = verify_code(user.access_code, user_dict)
 
     users.insert_one({"user_id" : user.username, "user_dict": user_dict, "otp":otp, "createdAt": creation})
     token = create_access_token({"sub": user.username})
@@ -159,13 +162,17 @@ async def verify(otp: int, token :str = Depends(oauth2_scheme), db = Depends(get
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
     user = users.find_one({"user_id": username})
     if not user:
         raise credentials_exception
-    
     if otp == user["otp"]:
-        db["users"].insert_one(user["user_dict"])
-        return ("success")
+        if user["user_dict"]["isDoctor"]:
+            db["doctors"].insert_one(user["user_dict"])
+            users.delete_one({"user_id": username})
+            return ({"msg": "Doctor succesfully created. Please login to continue."})
+        else:
+            db["users"].insert_one(user["user_dict"])
+            users.delete_one({"user_id": username})
+            return ({"msg": "User succesfully created. Please login to continue."})
     else:
         raise credentials_exception

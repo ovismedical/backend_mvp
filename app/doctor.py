@@ -3,20 +3,12 @@ from fastapi import Depends, FastAPI, HTTPException, status, APIRouter
 
 doctorrouter = APIRouter(prefix = "/doctor", tags = ["doctor"])
 
-@doctorrouter.post("/create")
-def create_doctor(email : str, password : str, db = Depends(get_db)):
-    users = db["doctors"]
-    user_dict = {"email" : email, "password" : password}
-
-    users.insert_one(user_dict)
-    return {"msg": "User created"}
-
 @doctorrouter.put("/create_code")
 def create_doctor(code:str,email : str, db = Depends(get_db)):
     doctors = db["doctors"]
     doctors.update_one(
-        {"email": email},      # Filter
-        {"$set": {"code": code}}  # Update
+        {"email": email},
+        {"$set": {"code": code}}
     )
     return {"msg": "code updated"}
     
