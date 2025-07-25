@@ -27,12 +27,12 @@ app.add_middleware(
 )
 
 from .login import loginrouter, get_user, get_db
-from .admin import adminrouter
+from .doctor import doctorrouter
 from .questions import questionsrouter
 from .florence import florencerouter
 
 app.include_router(loginrouter)
-app.include_router(adminrouter)
+app.include_router(doctorrouter)
 app.include_router(questionsrouter)
 app.include_router(florencerouter)
 
