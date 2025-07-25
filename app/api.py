@@ -100,7 +100,7 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                 "data": {
                     "total_messages": message_count,
                     "user_messages": user_messages,
-                    "symptoms_assessed": conversation.get("symptoms_assessed", []),
+                    "symptoms_assessed": list(conversation.get("structured_assessment", {}).get("symptoms", {}).keys()) if conversation.get("structured_assessment") else [],
                     "ai_powered": conversation.get("ai_powered", False),
                     "conversation_length": message_count,
                     "session_id": conversation.get("session_id"),
@@ -181,18 +181,8 @@ async def get_assessment_by_id(assessment_id: str, user = Depends(get_user), db 
                             "discussed": True
                         }
             else:
-                # Fallback for assessments without structured data
-                symptoms_assessed = florence_assessment.get("symptoms_assessed", [])
-                for symptom in symptoms_assessed:
-                    symptoms_data[symptom] = {
-                        "name": symptom.replace('_', ' ').title(),
-                        "icon": "📊",
-                        "frequency": 1,
-                        "intensity": 1,
-                        "key_indicators": [],
-                        "additional_notes": "No detailed data available",
-                        "discussed": True
-                    }
+                # Fallback for assessments without structured data - no symptom details available
+                symptoms_assessed = []  # No reliable symptom data without structured assessment
             
             return {
                 "success": True,

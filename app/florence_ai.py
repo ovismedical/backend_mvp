@@ -18,10 +18,6 @@ from .florence_utils import (
     ASSESSMENT_FUNCTION_SCHEMA_ZH,
     create_timestamp,
     generate_fallback_response,
-    update_symptoms_from_text,
-    determine_conversation_state,
-    calculate_progress,
-    is_assessment_complete,
     format_conversation_history_for_ai,
     handle_ai_response_error,
     load_florence_system_prompt,
@@ -34,7 +30,6 @@ class FlorenceAI:
         self.model = "gpt-4"
         self.temperature = 0.8
         self.conversation_state = "starting"  # starting, assessing, completing
-        self.assessed_symptoms = set()
         self.system_prompt = None  # Will be loaded when needed
         self.language = "en"  # Default language
         
@@ -83,7 +78,6 @@ class FlorenceAI:
         
         # Reset conversation state
         self.conversation_state = "starting"
-        self.assessed_symptoms = set()
         
         # Generate initial greeting
         try:
@@ -96,9 +90,7 @@ class FlorenceAI:
             
             return {
                 "response": response,
-                "conversation_state": self.conversation_state,
-                "symptoms_assessed": list(self.assessed_symptoms),
-                "progress": calculate_progress(self.assessed_symptoms)
+                "conversation_state": self.conversation_state
             }
             
         except Exception as e:
@@ -126,15 +118,9 @@ class FlorenceAI:
             # Get AI response
             response = await self._get_ai_response(ai_history)
             
-            # Update conversation state based on content
-            self._update_conversation_state(response, message)
-            
             return {
                 "response": response,
-                "conversation_state": self.conversation_state,
-                "symptoms_assessed": list(self.assessed_symptoms),
-                "progress": calculate_progress(self.assessed_symptoms),
-                "is_complete": is_assessment_complete(self.assessed_symptoms)
+                "conversation_state": self.conversation_state
             }
             
         except Exception as e:
@@ -158,14 +144,7 @@ class FlorenceAI:
             print(f"OpenAI API error: {e}")
             raise e
     
-    def _update_conversation_state(self, response: str, user_message: str):
-        """Update conversation state based on the dialogue"""
-        # Update symptoms using shared utility
-        combined_text = f"{response} {user_message}"
-        self.assessed_symptoms = update_symptoms_from_text(combined_text, self.assessed_symptoms)
-        
-        # Update conversation state using shared utility
-        self.conversation_state = determine_conversation_state(self.assessed_symptoms)
+# Note: Conversation state tracking simplified - AI now handles flow naturally
     
     async def generate_structured_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str = "undergoing_treatment", session_language: str = "en") -> Dict[str, Any]:
         """Generate a structured assessment using OpenAI function calling"""
@@ -265,8 +244,6 @@ class FlorenceAI:
                 print(f"🏁 Final structured assessment created with {len(symptoms)} symptoms")
                 return {
                     "structured_assessment": function_args,
-                    "symptoms_assessed": list(self.assessed_symptoms),
-                    "completion_rate": calculate_progress(self.assessed_symptoms),
                     "conversation_length": len(conversation_history)
                 }
             else:
@@ -296,13 +273,11 @@ class FlorenceAI:
                 "oncologist_notification_level": "none",
                 "treatment_status": treatment_status,
                 "mood_assessment": "Assessment completed through conversation with Florence",
-                "conversation_notes": f"Conversation with {len(conversation_history)} messages. Symptoms discussed: {list(self.assessed_symptoms)}"
+                "conversation_notes": f"Conversation with {len(conversation_history)} messages completed."
             }
             
             return {
                 "structured_assessment": fallback_assessment,
-                "symptoms_assessed": list(self.assessed_symptoms),
-                "completion_rate": calculate_progress(self.assessed_symptoms),
                 "conversation_length": len(conversation_history)
             }
             

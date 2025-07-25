@@ -62,7 +62,7 @@ def view_database():
                 print(f"   Created: {assessment.get('created_at', 'Unknown')}")
                 print(f"   Messages: {len(assessment.get('conversation_history', []))}")
                 print(f"   AI Powered: {assessment.get('ai_powered', False)}")
-                print(f"   Symptoms: {assessment.get('symptoms_assessed', [])}")
+                print(f"   Symptoms: {list(assessment.get('structured_assessment', {}).get('symptoms', {}).keys()) if assessment.get('structured_assessment') else []}")
         print()
     
     # Specific queries for daily check-ins

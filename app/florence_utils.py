@@ -35,7 +35,6 @@ class ConversationMessage(BaseModel):
 class FlorenceResponse(BaseModel):
     response: str
     conversation_state: str = "starting"
-    symptoms_assessed: List[str] = []
     progress: float = 0.0
     is_complete: bool = False
     error: Optional[str] = None
@@ -45,7 +44,6 @@ class SessionState(BaseModel):
     user_id: str
     status: str = "active"
     conversation_state: str = "starting"
-    symptoms_assessed: List[str] = []
     ai_available: bool = False
     created_at: str
     completed_at: Optional[str] = None
@@ -290,42 +288,11 @@ def generate_fallback_response(patient_name: str, context: str = "general") -> s
     }
     return fallback_responses.get(context, fallback_responses["general_followup"])
 
-def update_symptoms_from_text(text: str, current_symptoms: set) -> set:
-    """Update assessed symptoms based on text content"""
-    text_lower = text.lower()
-    updated_symptoms = current_symptoms.copy()
-    
-    # Check for specific symptoms using the new symptom names
-    for symptom in TARGET_SYMPTOMS:
-        if symptom == "lack_of_appetite":
-            if any(keyword in text_lower for keyword in ["appetite", "eating", "food", "hungry", "meal"]):
-                updated_symptoms.add(symptom)
-        else:
-            if symptom in text_lower:
-                updated_symptoms.add(symptom)
-    
-    # Check for pain variations
-    if any(keyword in text_lower for keyword in PAIN_KEYWORDS):
-        updated_symptoms.add("pain")
-    
-    return updated_symptoms
+# Note: Text-based symptom detection removed as it was unreliable.
+# The AI now uses structured assessment for accurate symptom tracking.
 
-def determine_conversation_state(symptoms_assessed: set) -> str:
-    """Determine conversation state based on assessed symptoms"""
-    if len(symptoms_assessed) >= len(TARGET_SYMPTOMS):
-        return "completing"
-    elif len(symptoms_assessed) > 0:
-        return "assessing"
-    else:
-        return "starting"
-
-def calculate_progress(symptoms_assessed: set) -> float:
-    """Calculate assessment progress as a percentage"""
-    return len(symptoms_assessed) / len(TARGET_SYMPTOMS)
-
-def is_assessment_complete(symptoms_assessed: set) -> bool:
-    """Check if assessment is complete"""
-    return len(symptoms_assessed) >= len(TARGET_SYMPTOMS)
+# Note: Functions for conversation state tracking removed as they were based on
+# unreliable keyword matching. The AI now handles conversation flow naturally.
 
 def should_flag_symptoms(symptoms: Dict[str, Dict], treatment_status: str) -> tuple:
     """
@@ -398,7 +365,7 @@ def handle_ai_response_error(error: Exception, context: str = "general", patient
         "error": str(error),
         "response": generate_fallback_response(patient_name, "processing_error"),
         "conversation_state": "starting",
-        "symptoms_assessed": [],
+
         "progress": 0.0,
         "is_complete": False
     }
@@ -425,7 +392,6 @@ def create_assessment_record(session_data: Dict, structured_assessment: Optional
         "completed_at": session_data.get("completed_at", create_timestamp()),
         "assessment_type": "florence_conversation",
         "florence_state": session_data.get("florence_state", "completed"),
-        "symptoms_assessed": session_data.get("symptoms_assessed", []),
         "ai_powered": session_data.get("ai_available", False),
         "oncologist_notification_level": structured_assessment.get("oncologist_notification_level", "none") if structured_assessment else "none",
         "flag_for_oncologist": structured_assessment.get("flag_for_oncologist", False) if structured_assessment else False
@@ -440,7 +406,7 @@ def create_session_response_data(session_data: Dict) -> Dict[str, Any]:
         "structured_assessment": session_data.get("structured_assessment"),
         "created_at": session_data["created_at"],
         "florence_state": session_data.get("florence_state", "starting"),
-        "symptoms_assessed": session_data.get("symptoms_assessed", []),
+
         "ai_available": session_data.get("ai_available", False),
         "oncologist_notification_level": session_data.get("oncologist_notification_level", "none"),
         "flag_for_oncologist": session_data.get("flag_for_oncologist", False)

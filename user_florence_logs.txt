@@ -1,0 +1,645 @@
+🔍 Florence Patient Assessment Viewer
+========================================
+🔗 Connected to MongoDB
+👤 Looking up patient: 李永銓
+======================================================================
+✅ Found 6 Florence assessment(s)
+
+🗂️  Assessment #1
+📅 Created: 2025-07-24 13:45:33
+📅 Completed: 2025-07-24 13:57:25
+🆔 Session ID: 李永銓_1753364727
+🌐 Language: zh-HK
+🤖 AI Powered: Yes
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: 你好，李永銓先生，歡迎你來做健康檢查。我們可以先聊聊你最近的生活情況，例如你最近有沒有做些什麼特別的事情？
+
+👤 Patient: 還有咳嗽同佢兩個食
+
+🤖 Florence: 明白。我聽到你提到有咳嗽的問題，咳嗽的情況持續左幾耐呀？每日又大概咳幾多次呢？
+
+👤 Patient: 幾個月，每日兩至三次
+
+🤖 Florence: 好的，多謝你分享。聽你所講，你每日都會咳兩至三次，持續左幾個月。想問下你每日咳嗽既時候會唔會感到好辛苦或者唔方便？係咳嗽既時候會唔會痛呢？同埋你有冇咁嗽出痰呢？
+
+👤 Patient: 有淺黃色痰
+
+🤖 Florence: 好的，感謝你的回答，我明白你有咳痰的情況。那麼我們再轉移一下話題，你最近有冇感到特別累或者疲倦呢？例如做日常活動會感到吃力或者需要休息？
+
+👤 Patient: 有時咳得厲害，有少少痛
+
+🤖 Florence: 明白，咳得厲害的時候會有少少痛。你可以形容下那種痛係點呢？例如係刺痛、鈍痛定係其他？而痛感又會持續幾耐呢？
+
+👤 Patient: 如下樓梯會喘氣
+
+🤖 Florence: 好的，我明白你現在係做一啲身體活動，例如行樓梯的時候，會感到喘氣。想問下你有冇試過係做一啲輕微活動，例如行平地或者做家務的時候都會喘氣呢？同埋，你有冇因為疲累或者喘氣而需要休息，或者減少你日常的活動呢？
+
+👤 Patient: 少少
+
+🤖 Florence: 明白哂，感謝你的分享。你有無感到你最近嘅食慾有所改變呢？比如話食得比平時少，或者對某啲食物冇咗興趣？
+
+👤 Patient: 盡量食啲自己鍾意食嘅嘢
+
+🤖 Florence: 好嘅，感謝你分享。你有冇試過覺得胃口唔好，或者食完之後覺得有少少噁心呢？
+
+👤 Patient: 每晚飲營養奶補充
+
+🤖 Florence: 好嘅，你有定時補充營養，咁做係非常好。你有冇試過飲完營養奶之後覺得有啲噁心或者胃部唔舒服呢？
+
+👤 Patient: 無，飲完營養奶係補充好好
+
+🤖 Florence: 好嘅，咁樣你飲完營養奶之後冇感到噁心，甚至更覺得舒服，咁樣係好好嘅。我哋再諗下，你之前有講過你有咳嗽，我想問下你有冇試過因為咳嗽而覺得胸口唔舒服或者痛呢？
+
+👤 Patient: 有時有，有輕微血跡
+
+🤖 Florence: 我明白，有時你咳嗽時會感到胸口有少少不舒服，並且有輕微血跡。你有冇因此去看醫生或者求診呢？同埋有冇掉過醫生開的藥？
+
+👤 Patient: 冇
+
+🤖 Florence: 好嘅，多謝你分享。如果你感到身體不適或者有任何問題，記得去求診，尤其係你有咳出血的情況，呢個可能需要專業醫療人員嘅評估同治療。我哋再回到你之前講過嘅疲勞感，除咗下樓梯會喘氣之外，你有冇試過做其他日常活動，例如買菜或者做家務嘅時候，都會感到特別累或者需要休息呢？
+
+👤 Patient: 知道
+
+🤖 Florence: 好的，多謝你的回覆。除了日常活動以外，你有冇試過在做一些較為輕鬆的活動，例如看電視或者閱讀的時候，都會感到特別疲倦或者需要休息呢？
+
+👤 Patient: 暫時冇
+
+🤖 Florence: 好嘅，多謝你回答。咁我哋再談談最後一個情況，你有冇試過因為咳嗽或者胸口痛而影響你休息或者睡眠呢？例如說，你會唔會因為咳嗽而醒過嚟，或者因為胸口痛而難以入
+
+👤 Patient: 鼻水倒流落喉嚨嗰度會咳咳嗽瞓唔到
+
+🤖 Florence: I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?
+
+👤 Patient: 點解變咗英文？
+
+🤖 Florence: I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-24 13:57:25
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: Yes
+⚠️  Notification Level: AMBER
+🔍 Flag Reason: Severe fatigue - high frequency (3) or severity (3)
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 2/5
+      Severity:  2/5
+      Key Indicators:
+        • 有淺黃色痰
+        • 有輕微血跡
+      Notes: 咳嗽持續數月，每日約兩至三次，有時咳得嚴重會感到胸口痛楚，咳痰時會有淺黃色的痰，且有輕微的血跡。
+
+   🔸 Nausea:
+      Frequency: 1/5
+      Severity:  1/5
+      Notes: 病人表示沒有噁心的情況，飲完營養奶會覺得舒服。
+
+   🔸 Lack Of Appetite:
+      Frequency: 2/5
+      Severity:  2/5
+      Key Indicators:
+        • 盡量食啲自己鍾意食嘅嘢
+        • 每晚飲營養奶補充
+      Notes: 病人表示最近會盡量吃自己喜歡的食物，並且每晚會喝營養奶補充體力。
+
+   🔸 Fatigue:
+      Frequency: 3/5
+      Severity:  3/5
+      Key Indicators:
+        • 如下樓梯會喘氣
+        • 有時會感到特別累
+      Notes: 病人表示如下樓梯會感到喘氣，有時會感到特別累，特別是在做日常活動時。
+
+   🔸 Pain:
+      Frequency: 2/5
+      Severity:  2/5
+      Location:  胸口
+      Key Indicators:
+        • 有時有輕微血跡
+      Notes: 病人表示有時會感到胸口痛，特別是在咳嗽的時候，並且有輕微的血跡。
+
+😊 Mood Assessment: 病人的講話表現出一定的壓力，並且對於自己的身體狀況有一定的關注。
+📋 Notes: 病人的病情與上次訪談時沒有明顯的改善，並且有持續的咳嗽和胸口痛的症狀，需要腫瘤科醫生的評估。
+
+======================================================================
+
+🗂️  Assessment #2
+📅 Created: 2025-07-12 15:18:39
+📅 Completed: 2025-07-12 15:27:23
+🆔 Session ID: 李永銓_1752333515
+🌐 Language: zh-HK
+🤖 AI Powered: Yes
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: 您好，李永銓先生，歡迎光臨。近來過得如何呢？還有出去走走嗎？
+
+👤 Patient: 今日咳得頻繁啲。
+
+🤖 Florence: 真係好唔舒服呀！咳得頻繁，會唔會有痰？如果有的話，痰的顏色係點呢？
+
+👤 Patient: 中黃色
+
+🤖 Florence: 明白了，中黃色的痰。李先生，如果用一個1至5的等級來評估，1級代表偶爾咳嗽，5級代表整天整夜都在咳，你會覺得你的咳嗽程度大概係幾多級呢？
+
+👤 Patient: 要調節呼吸
+
+🤖 Florence: 聽起來你的咳嗽情況可能嚴重了一點。如果用一個1至5的等級來評估，1級表示只是清嗓子，5級表示咳嗽非常嚴重，你會覺得你的咳嗽程度大概係幾多級呢？
+
+👤 Patient: 3級
+
+🤖 Florence: 好的，謝謝你。聽你咁講，你嘅咳嗽已經有少少影響到你嘅日常生活。你之前有冇試過用藥控制咳嗽呢？如果有，有冇覺得有效？
+
+👤 Patient: 有，現在試吓
+
+🤖 Florence: 好的，現在你正在試驗用藥來控制咳嗽。希望你嘅咳嗽情況能快啲好轉。再問你一樣嘢，你會唔會覺得累呀，或者比平時更易疲倦？
+
+👤 Patient: －半半
+
+🤖 Florence: 了解，有時會覺得累。如果你可以用1至5等級評估你疲勞的程度，1級是輕微疲勞，能正常活動，5級是極度疲勞，甚至無法照顧自己，你會選擇哪一級呢？
+
+👤 Patient: 2級
+
+🤖 Florence: 好的，謝謝你的回答。你有一些輕度疲勞，並且你的活動有點受限。再詢問你一下，你最近的食慾如何？食得多還是少，或者跟平時差不多？
+
+👤 Patient: 差小小，現在喝營飬奶
+
+🤖 Florence: 了解，你現在對食物的興趣有點下降，改為多喝營養奶。如果用1至5的等級來評估你的食慾，1級是食慾正常，5級是幾乎沒有食慾，你會選擇哪一級呢？
+
+👤 Patient: 3級
+
+🤖 Florence: 好的，了解。你現在的食慾中度下降，可能攝取的食物量只有平常的50-75%。最後，我想問你，你會唔會覺得身體有啲唔舒服或者痛呀？例如背疼或者腿疼咁？
+
+👤 Patient: 好少
+
+🤖 Florence: 好的，明白了，你的身體並無甚麼特別的不適或疼痛，會覺得疼痛的時間很少。謝謝你提供這些重要的信息，我會記錄下來。如果你有其他問題或者想要分享的事情，也可以隨時告訴我。
+
+👤 Patient: Ok
+
+🤖 Florence: 好的，李先生。如果您有任何需要，隨時告訴我。祝您身體健康，照顧好自己。再見！
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-12 15:27:23
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: Yes
+⚠️  Notification Level: AMBER
+🔍 Flag Reason: Severe cough - high frequency (3) or severity (3)
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 3/5
+      Severity:  3/5
+      Key Indicators:
+        • 中黃色的痰
+      Notes: 正在試藥控制咳嗽
+
+   🔸 Nausea:
+      Frequency: 1/5
+      Severity:  1/5
+      Notes: 病人尚未提及噁心的問題
+
+   🔸 Lack Of Appetite:
+      Frequency: 3/5
+      Severity:  3/5
+      Key Indicators:
+        • 現在喝營養奶
+      Notes: 食物攝取量約為平常的50-75%
+
+   🔸 Fatigue:
+      Frequency: 2/5
+      Severity:  2/5
+      Key Indicators:
+        • 有時會覺得累
+      Notes: 有輕微疲勞，活動有點受限
+
+   🔸 Pain:
+      Frequency: 1/5
+      Severity:  1/5
+      Location:  不具體
+      Notes: 並無甚麼特別的不適或疼痛，會覺得疼痛的時間很少
+
+😊 Mood Assessment: 病人在對話中顯示出穩定的情緒並與我們保持良好的溝通
+📋 Notes: 病人李永銓先生，正在接受治療，他表示咳嗽有增加，並有中黃色的痰。他也提到有輕微的疲勞和食慾有所下降，不過沒有太大的疼痛問題。
+
+======================================================================
+
+🗂️  Assessment #3
+📅 Created: 2025-07-11 14:28:42
+📅 Completed: 2025-07-11 14:49:57
+🆔 Session ID: 李永銓_1752244119
+🌐 Language: zh-HK
+🤖 AI Powered: Yes
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: 你好，李先生，歡迎你！最近咩事情令你開心呢？
+
+👤 Patient: 囡囡和我下兩星期去澳門看水舞間和去珠海旅行
+
+🤖 Florence: 呢個計劃聽落去好好玩呀，你應該好期待吧？話說返，你覺得自己最近體力點樣呢？準備充足咗去旅行定係覺得有啲累？
+
+👤 Patient: 身體弱了些還有咳嗽和胃口不好
+
+🤖 Florence: 聽你講，你覺得自己最近身體有啲弱，同埋有咳嗽同食慾唔好嘅情況，咁我哋一個一個來講吖。首先，關於你講嘅身體有啲弱嘅部分，你能唔能講多啲？例如，你會覺得成日都好累，定係只係做多啲活動嘅時候會感到累呢？
+
+👤 Patient: 時常累
+
+🤖 Florence: 明白喇，係咪成日覺得唔想做嘢，或者做一陣就要休息下呢？還是更加嚴重，例如成日都想躺喺床上休息呢？
+
+👤 Patient: 是
+
+🤖 Florence: 明白喇。你覺得你個種疲勞嘅感覺，係咪每日都會有，定係只係某啲日子會有？同埋你覺得佢有冇影響你日常生活，例如行路或者做一啲日常嘅工作呢？
+
+👤 Patient: 每日都有．要尋找新目標。心理和體能都要改善
+
+🤖 Florence: 我明白你嘅感受，疲勞可能會對你嘅日常生活造成影響。講返你之前提到嘅咳嗽問題，你能唔能描述吓你嘅咳嗽情況？例如，你每日會咳幾多次？咳嗽時會唔會有痰呢？
+
+👤 Patient: 有痰，有食化痰藥水，有時訓吓郁吓就好像鼻水倒流在。所以即刻飲小小溫水就可以喉嚨
+
+🤖 Florence: 你講嘅咳嗽問題，我大概明白啦。咁除咗會咳痰，你每日大概會咳幾多次呢？係一直都有咳，定係只喺某啲時間會有？
+
+👤 Patient: 不定，經常會
+
+🤖 Florence: 明白喇，你之前講嘅食慾唔好，能唔能講多啲？例如，你一日會食幾餐？你覺得自己食得少定係完全冇食慾呢？
+
+👤 Patient: 現在－日兩餐中午十二點半和下午七時，但近排食唔落？會十時至十－時欲補充奶
+
+🤖 Florence: 了解，你嘅胃口不太好，每日兩餐，但最近覺得食得唔多，有時會飲啲奶來補充。請問你覺得呢個情況係唔係每日都有，定係間中先會有呢？而且你覺得呢個情況有冇影響到你嘅日常生活呢？例如你嘅體重有冇下降？
+
+👤 Patient: 每日到時，所以瘦了很多
+
+🤖 Florence: 明白，食慾不振同埋體重下降對你嚟講一定係好困擾。我哋再了解多啲你嘅情況，你覺得呢個問題有冇困擾到你嘅日常生活呢？例如，你有冇因為唔想食嘢而唔去進行日常嘅活動？還是有冇嘗試過因為要食嘢而感到痛苦呢？
+
+👤 Patient: 現在嘗試去解決
+
+🤖 Florence: 你嘅積極態度真係好讚呢！你有咩方法或者計劃想解決呢個問題呢？例如試過改變飲食習慣或者食療補品呢？
+
+👤 Patient: 有空就食的自己鐘意食的東西，例如－星期去食吓自助餐或海鮮。
+
+🤖 Florence: 好嘅，知道你鍾意食嘅嘢同埋讓自己開心，呢個方法真係唔錯，希望可以幫到你改善食慾。呢個問題我哋傾咗好多，你仲有冇咩其它問題或者困擾想同我分享呢？
+
+👤 Patient: 是
+
+🤖 Florence: 好嘅, 請問你還有什麼問題或者困擾想同我分享呢？
+
+👤 Patient: 今日差不多
+
+🤖 Florence: 好嘅，李先生。如果你以後有咩問題或者
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-11 14:49:57
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: Yes
+⚠️  Notification Level: AMBER
+🔍 Flag Reason: Severe lack_of_appetite - high frequency (4) or severity (4)
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 3/5
+      Severity:  2/5
+      Key Indicators:
+        • 有痰，有食化痰藥水，有時訓吓郁吓就好像鼻水倒流在。所以即刻飲小小溫水就可以喉嚨
+      Notes: 咳嗽症狀不定，經常會出現，咳嗽時會有痰，需要進一步觀察並提供適當的藥物控制
+
+   🔸 Nausea:
+      Frequency: 0/5
+      Severity:  0/5
+
+   🔸 Lack Of Appetite:
+      Frequency: 4/5
+      Severity:  4/5
+      Key Indicators:
+        • 現在－日兩餐中午十二點半和下午七時，但近排食唔落?會十時至十一時欲補充奶
+      Notes: 病人食慾不振，且體重明顯下降，病人需要進一步的營養支援，並進行適當的營養諮詢
+
+   🔸 Fatigue:
+      Frequency: 5/5
+      Severity:  4/5
+      Key Indicators:
+        • 身體弱了些，時常累
+      Notes: 病人經常感到疲勞，需要進一步評估其可能的原因，並提供適當的支援
+
+   🔸 Pain:
+      Frequency: 0/5
+      Severity:  0/5
+
+😊 Mood Assessment: 病人反應活躍，正面處理病情，但體能下降及食慾不振，可能影響其情緒狀態和生活質量
+📋 Notes: 病人講述他近期的體能狀況和生活情況，表達了對身體狀況的關注，病人表示正在尋找新的生活目標，並希望心理和體能都能得到改善
+
+======================================================================
+
+🗂️  Assessment #4
+📅 Created: 2025-07-10 12:38:22
+📅 Completed: 2025-07-10 12:55:16
+🆔 Session ID: 李永銓_1752151096
+🌐 Language: zh-HK
+🤖 AI Powered: Yes
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: 你好，李先生。好高興見到你。我們來談談你最近的身體狀況。首先，你最近食慾如何？有無覺得特別想食或者就唔想食呢？
+
+👤 Patient: 食少了，胃口不好
+
+🤖 Florence: 啱啱你提到你胃口唔好，最近個食慾會唔會好似無咗咁？食得唔多，係咪好似平時食嘅一半都唔如？
+
+👤 Patient: 不過夜晚會飲營養奶
+
+🤖 Florence: 你有冇覺得飲咗營養奶之後會有少少噁心嘅感覺呢？還是飲咗之後感覺仲算ok嘅？
+
+👤 Patient: 飲咗ok
+
+🤖 Florence: 哦，咁你飲營養奶嘅時候都冇噁心嘅感覺，聽你咁講應該都無乜噁心嘅情況，咁至於你嘅胃口呢，覺得食慾減低，食得比平時少。咁呢，我想再問問，你最近有冇咳嗽或者痛楚呢？
+
+👤 Patient: 冇噁心，ok
+
+🤖 Florence: 噢，你冇咳嗽同痛楚嘅情況，咁好好。我想再問你，最近你有冇覺得特別累，就係好似無咩力氣咁？還是你覺得自己嘅能量都同平時差唔多？
+
+👤 Patient: 還有咳，成日坐，成日訓，沒運動
+
+🤖 Florence: 噢，你提到自己成日都坐低或者訓覺，所以係好少運動同出街行。咁你覺得自己好似無咩力氣，還是只係覺得有少少累呢？
+
+👤 Patient: 心理沒有目標，現在要保持心境開朗
+
+🤖 Florence: 好的，李先生，我知道你現在正在努力保持開朗的心情。我們繼續談談你的身體情況，你有冇覺得疲累，係咪每日都好似需要訓覺咁？還是只係有時候會覺得有啲累？
+
+👤 Patient: 習慣性，因為有時一郁動就氣喘或該嗽
+
+🤖 Florence: 哦，我明白了。咁你有冇覺得每次嗽嘅時候會嗽得好嚴重，還是只係嗽咗一兩下就冇事？你嗽嘅情況會唔會每日都有，還是只係間中會發生呢？
+
+👤 Patient: 每日都有，但喝少少水就可以控制
+
+🤖 Florence: 明白，你每日都會咳，但係飲咗啲水之後就可以控制到。咁至於你嘅咳嗽，你會唔會覺得好嚴重，好似好難忍受咁？定係只係間中會覺得有少少唔舒服？
+
+👤 Patient: 都有一定的難受，但忍－忍可以控制
+
+🤖 Florence: 哦，咁樣嘅話，聽你咁講我覺得你嘅咳嗽情況應該唔算太嚴重，不過都有一定嘅困擾。我再問你，你咳嗽嘅時候有冇咳出痰呢，定係只係乾咳？若果有痰，嗰個痰會唔會有顏色呢？
+
+👤 Patient: 有痰，中黃色
+
+🤖 Florence: 哦，我了解。你嘅痰係中黃色，並且每日都會咳，但係飲水可以控制。除咗咳嗽同食慾減低之外，你還有冇其他唔舒服嘅地方呢？例如頭痛、肚痛或者其他地方痛呢？
+
+👤 Patient: 醫生有開咳丸，化痰丸，還有二種噴劑
+
+🤖 Florence: 好的，明白。你現在有食緊醫生開俾你嘅咳丸同埋化痰丸，同埋用緊兩種噴劑。咁呢，你有冇覺得醫生開俾你嘅藥對你嘅咳嗽有冇幫助呢？還是你覺得食咗藥之後，咳嗽嘅情況冇有變化？
+
+👤 Patient: 現在試吓邊隻藥可以令我舒服啲
+
+🤖 Florence: 好的，李先生。我了解你現在正在嘗試不同的藥物，看看哪種藥物能讓你感到更舒服。我們會繼續密切關注你的狀況。謝謝你分享這些資
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-10 12:55:16
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: No
+⚠️  Notification Level: NONE
+🔍 Flag Reason: 雖然病人的咳嗽症狀可以由飲水控制，但仍建議腫瘤科醫生關注其持續的咳嗽情況
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 3/5
+      Severity:  2/5
+      Key Indicators:
+        • 每日都有咳嗽
+        • 有中黃色痰
+        • 喝水可以控制
+      Notes: 正在試用醫生開的咳丸、化痰丸和兩種噴劑
+
+   🔸 Nausea:
+      Frequency: 1/5
+      Severity:  1/5
+      Key Indicators:
+        • 沒有噁心的感覺
+      Notes: 即使飲營養奶也不會感到噁心
+
+   🔸 Lack Of Appetite:
+      Frequency: 3/5
+      Severity:  2/5
+      Key Indicators:
+        • 飲食量減少
+        • 晚上會飲營養奶
+      Notes: 儘管飲食量減少，但仍努力維持營養攝取
+
+   🔸 Fatigue:
+      Frequency: 3/5
+      Severity:  2/5
+      Key Indicators:
+        • 常常坐著或睡覺
+        • 少有運動
+        • 有時會氣喘
+      Notes: 可能由於缺乏運動和疲勞感導致活動量減少
+
+   🔸 Pain:
+      Frequency: 1/5
+      Severity:  1/5
+      Location:  無
+      Key Indicators:
+        • 沒有提到疼痛
+      Notes: 病人沒有提到任何疼痛的情況
+
+😊 Mood Assessment: 病人正在努力保持開朗的心情，但在尋找能使症狀舒緩的藥物
+📋 Notes: 病人的飲食量有所減少，但仍會確保營養攝取，例如晚上會飲營養奶。病人表示自己每天都會咳嗽，有中黃色的痰，但可以由飲水控制。病人也提到自己常常坐著或睡覺，少有運動，有時會氣喘，這可能是疲勞的表現。病人正在試用醫生開的咳丸、化痰丸和兩種噴劑，以找出最能舒緩症狀的藥物。
+
+======================================================================
+
+🗂️  Assessment #5
+📅 Created: 2025-07-09 13:45:16
+📅 Completed: 2025-07-09 13:45:38
+🆔 Session ID: 李永銓_1752068714
+🌐 Language: zh-HK
+🤖 AI Powered: No
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: Hello 李永銓! I'm Florence, your AI nurse. I'm here to chat with you about how you're feeling today. How are you doing?
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-09 13:45:38
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: No
+⚠️  Notification Level: NONE
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 1/5
+      Severity:  1/5
+
+   🔸 Nausea:
+      Frequency: 1/5
+      Severity:  1/5
+
+   🔸 Lack Of Appetite:
+      Frequency: 1/5
+      Severity:  1/5
+
+   🔸 Fatigue:
+      Frequency: 1/5
+      Severity:  1/5
+
+   🔸 Pain:
+      Frequency: 1/5
+      Severity:  1/5
+
+😊 Mood Assessment: Assessment completed through conversation with Florence
+📋 Notes: Conversation with 1 messages. Symptoms discussed: []
+
+======================================================================
+
+🗂️  Assessment #6
+📅 Created: 2025-07-09 13:11:44
+📅 Completed: 2025-07-09 13:38:57
+🆔 Session ID: 李永銓_1752066700
+🌐 Language: zh-HK
+🤖 AI Powered: Yes
+
+📝 Conversation Log:
+--------------------------------------------------
+🤖 Florence: 你好，李先生。我們一齊傾吓偈，我可以了解吓你嘅身體狀況。最近天氣點呢？你有冇出去行下？
+
+👤 Patient: 今天身體幾好，
+
+🤖 Florence: 聽您講咁，我覺得好安慰。你呢陣子有冇覺得特別累或者唔夠力呢？
+
+👤 Patient: 條氣還有少少喘氣
+
+🤖 Florence: 喘氣嘅情況係成日都有，定係做運動或者上樓梯嘅時候先有呢？
+
+👤 Patient: 還有和都會大學硏究院，現在每天要帶手錶⌚️和腰帶一個星期，除了冲涼不可以除，有點不習慣
+
+🤖 Florence: 你帶手錶同腰帶係為咗咩呢？會唔會覺得唔舒服或者影響你日常生活呢？
+
+👤 Patient: 氣喘是坐定一起身行就有，有時又好像鼻水倒流，一咳就不停
+
+🤖 Florence: 咁樣咳嘅情況，每日大概有幾多次呢？會唔會覺得好痛或者有痰出嚟呢？
+
+👤 Patient: 因為咳了幾個月了，又時咳得大力會痛的
+
+🤖 Florence: 好明白，你咳得嗰陣嘅痛楚，點樣形容呢？例如係刺嗰種痛，定係好似壓迫嘅感覺，抑或者其他方式呢？
+
+👤 Patient: 現在－咳就飲的水就八成可以停
+
+🤖 Florence: 有冇試過飲完水都止唔到嗽，或者咳得特別厲害嘅時候呢？另外，你每日咳嗽嘅次數多唔多呢？
+
+👤 Patient: 醫生有比噴劑我，
+
+🤖 Florence: 好嘅，你噴劑噴之後咳嘅情況會唔會好啲呢？而且呢件事會唔會影響你一日嘅活動同心情呢？
+
+👤 Patient: 不現好d
+
+🤖 Florence: 好嘅，我明白咗。所以雖然你嘅咳嗽未能完全控制，但係噴劑可以幫到你。我想問你下，你對食物有冇特別嘅感覺呢？例如你嘅食慾會唔會有變化呢？
+
+👤 Patient: 我除了不吃太辣從未戒口
+
+🤖 Florence: 明白喇，你嘅飲食習慣大致上冇變。你最近有冇覺得唔想食嘢，定係食少咗呢？另外，你會唔會覺得好易噁心或者吐呢？
+
+👤 Patient: 但現在瘦了，胃口都冇食咁多肥唔返
+
+🤖 Florence: 你嘅食量比以前少咗，會唔會係因為冇咁餓，定係食嘢嘅時候覺得胃口唔好或者覺得嘔呢？
+
+👤 Patient: 胃口不好
+
+🤖 Florence: 聽你咁講，我明白你可能會有啲唔舒服。你有冇試過嘔吐，或者覺得特別噁心呢？呢啲情況會唔會好似每日都出現咁？
+
+👤 Patient: 個人賴咗，早上沒有吃早餐了，等中午一齊食
+
+🤖 Florence: 噢，你嘅飲食時間有所改變。我想了解下，你呢段時間有冇覺得特別痛或者有任何唔舒服嘅地方呢？
+
+👤 Patient: 冇
+
+🤖 Florence: 好嘅，聽你咁講我都放心啲。那你有冇其他嘅問題或者困擾想同我分享呢？我希望我可以幫到你。
+
+👤 Patient: 我覺得現在沒有之前心理質素那麼強大，心理影響身理
+
+🤖 Florence: 我明白你嘅感受，我哋面對身體上嘅改變時，心理壓力都會變大。我哋可以透過各種方式去舒緩壓力，例如進行適量運動、傾訴心聲或者做自己鍾意做嘅事。你覺得呢啲方法對你有幫助嗎？還是你有其他的方式去處理壓力呢？
+
+👤 Patient: 我沒做運動，
+
+🤖 Florence: 無問題，每個人都有自己舒緩壓力嘅方式。你有冇其他興趣或者鍾意嘅事可以幫助你放鬆心情呢？例如聽音樂、睇書或者同朋友傾偈等等。
+
+👤 Patient: 現在太太和家人，常常和我去旅行！
+
+🤖 Florence: 真喺好好
+
+👤 Patient: 我上星期才去了雲南八天旅遊
+
+🤖 Florence: I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?
+
+👤 Patient: 下兩星期，囡囡和她男友，老婆訂了去澳門看水舞間之後去珠海玩
+
+🤖 Florence: I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?
+
+👤 Patient: 點解講了英文？我不明白
+
+🤖 Florence: I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?
+
+
+🔬 Structured Assessment:
+--------------------------------------------------
+📅 Timestamp: 2025-07-09 13:38:57
+👤 Patient ID: 李永銓
+🏥 Treatment Status: undergoing_treatment
+🚨 Oncologist Flag: Yes
+⚠️  Notification Level: AMBER
+🔍 Flag Reason: Severe cough - high frequency (3) or severity (3)
+
+💊 Symptoms Assessment:
+
+   🔸 Cough:
+      Frequency: 3/5
+      Severity:  3/5
+      Key Indicators:
+        • 有時候一咳就不停
+      Notes: 咳嗽情況已經持續了幾個月，咳得特別劇烈時會感到痛。現在正在使用醫生開的噴劑。
+
+   🔸 Nausea:
+      Frequency: 1/5
+      Severity:  1/5
+      Notes: 病人沒有提到噁心或嘔吐的情況。
+
+   🔸 Lack Of Appetite:
+      Frequency: 3/5
+      Severity:  2/5
+      Key Indicators:
+        • 胃口不好
+      Notes: 病人的食慾下降，飲食習慣改變，現在一直到中午才吃東西。
+
+   🔸 Fatigue:
+      Frequency: 4/5
+      Severity:  3/5
+      Key Indicators:
+        • 氣喘是坐定一起身行就有
+      Notes: 病人有氣喘的問題，並表示已經習慣。
+
+   🔸 Pain:
+      Frequency: 2/5
+      Severity:  2/5
+      Location:  不明
+      Notes: 病人沒有提到疼痛的問題。
+
+😊 Mood Assessment: 病人表示他的心理素質現在沒有以前強大，並認為心理影響身理。他的家人正在陪伴他一起出去旅行，為他帶來了正能量。
+📋 Notes: 病人現在正在接受治療。他有咳嗽，咳嗽劇烈時會痛，並且有氣喘的問題。他的食慾下降，但沒有噁心或嘔吐的情況。他的情緒狀態受到影響，心理素質下降，但他的家人正在積極地陪伴他，他也從旅行中得到快樂。
+
+======================================================================
+

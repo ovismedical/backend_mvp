@@ -159,7 +159,6 @@ async def start_florence_session(
             "created_at": create_timestamp(),
             "structured_assessment": None,  # Will be populated when session completes
             "florence_state": florence_response.get("conversation_state", "starting"),
-            "symptoms_assessed": florence_response.get("symptoms_assessed", []),
             "ai_available": ai_available,
             "oncologist_notification_level": "none",
             "flag_for_oncologist": False
@@ -236,7 +235,6 @@ async def send_message_to_florence_endpoint(
                 ai_response = florence_response["response"]
                 # Update session state
                 session["florence_state"] = florence_response.get("conversation_state", "assessing")
-                session["symptoms_assessed"] = florence_response.get("symptoms_assessed", [])
         else:
             # Fallback response when AI is not available using shared utility
             ai_response = generate_fallback_response(user.get('full_name', user['username']), "general_followup")
@@ -249,8 +247,7 @@ async def send_message_to_florence_endpoint(
             "success": True,
             "message": "Message sent to Florence",
             "response": ai_response,
-            "florence_state": session.get("florence_state", "assessing"),
-            "symptoms_assessed": session.get("symptoms_assessed", [])
+            "florence_state": session.get("florence_state", "assessing")
         }
         
     except Exception as e:

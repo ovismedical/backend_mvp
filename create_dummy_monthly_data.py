@@ -48,7 +48,7 @@ def create_assessment(date, session_id, symptoms_data, user_info, oncologist_lev
         "completed_at": (date + timedelta(minutes=random.randint(5, 20))).isoformat(),
         "assessment_type": "florence_conversation",
         "florence_state": "completed",
-        "symptoms_assessed": list(symptoms_data.keys()),
+
         "ai_powered": True,
         "oncologist_notification_level": oncologist_level,
         "flag_for_oncologist": flag_oncologist
