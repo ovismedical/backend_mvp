@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
@@ -61,10 +62,10 @@ def create_access_token(data: dict, admin = False):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
-    users = db["users"]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        doctor = payload.get("admin")
         temp = payload.get("exp")
         if username is None:
             raise credentials_exception
@@ -75,11 +76,15 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
-    user = users.find_one({"username": username}, {"_id": 0, "password": 0})
+    if doctor:
+        users = db["doctors"]
+        user = users.find_one({"username": username}, {"_id": 0, "password": 0})
+    else:
+        users = db["users"]
+        user = users.find_one({"username": username}, {"_id": 0, "password": 0})
     if not user:
         raise credentials_exception
-    return user
+    return jsonable_encoder(user)
 
 def gen_otp():
     otp = 0
@@ -93,12 +98,14 @@ def verify_code(code, user_dict):
     doctor = doctors.find_one({"code":code})
     hospitals = db["hospitals"]
     hospital = hospitals.find_one({"code":code})
+    new_user = user_dict.copy()
+    new_user.pop("access_code")
     if doctor:
-        user_dict.update({"isDoctor": False, "doctor": doctor["username"]})
-        return user_dict
+        new_user.update({"isDoctor": False, "doctor": doctor["username"]})
+        return new_user
     if hospital:
-        user_dict.update({"isDoctor": True, "hospital": hospital["name"]})
-        return user_dict
+        new_user.update({"isDoctor": True, "hospital": hospital["name"]})
+        return new_user
     raise HTTPException(status_code=400, detail="Invalid access code")
 
 @loginrouter.post("/configure_db")
@@ -129,18 +136,24 @@ def register(user: UserCreate, db = Depends(get_db)):
 
     user_dict = verify_code(user.access_code, user_dict)
 
-    users.insert_one({"user_id" : user.username, "user_dict": user_dict, "otp":otp, "createdAt": creation})
+    users.insert_one({"user_id" : user.username, "user_dict": user_dict, "otp":hash_password(otp), "createdAt": creation})
     token = create_access_token({"sub": user.username})
-    return {"temp_token":token}
+    return {"temp_token":token, "access_code": otp}
 
 @loginrouter.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
-    users = db["users"]
-    user = users.find_one({"username": form_data.username})
-    if not user or not verify_password(form_data.password, user["password"]):
-        return ({"details":"Invalid credentials"}) 
-    token = create_access_token({"sub": user["username"]})
-    return {"access_token": token, "token_type": "Bearer"}
+    user = db["users"].find_one({"username": form_data.username})
+    if not user:
+        user = db["doctors"].find_one({"username": form_data.username})
+        if not user:
+            return ({"details":"Invalid credentials"}) 
+        if verify_password(form_data.password, user["password"]):
+            token = create_access_token({"sub": user["username"]}, admin = True)
+            return {"access_token": token, "token_type": "Bearer"}
+    if verify_password(form_data.password, user["password"]):
+        token = create_access_token({"sub": user["username"]})
+        return {"access_token": token, "token_type": "Bearer"}
+    return ({"details":"Invalid credentials"}) 
 
 @loginrouter.get("/userinfo")
 async def get_info(user = Depends(get_user)):
@@ -165,7 +178,7 @@ async def verify(otp: int, token :str = Depends(oauth2_scheme), db = Depends(get
     user = users.find_one({"user_id": username})
     if not user:
         raise credentials_exception
-    if otp == user["otp"]:
+    if verify_password(otp, user["otp"]):
         if user["user_dict"]["isDoctor"]:
             db["doctors"].insert_one(user["user_dict"])
             users.delete_one({"user_id": username})
