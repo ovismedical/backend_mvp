@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 from typing import Annotated
 import random
 import math
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
 # Load .env from current directory
@@ -87,9 +89,9 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     return jsonable_encoder(user)
 
 def gen_otp():
-    otp = 0
+    otp = ""
     for i in range(4):
-        otp+=(math.floor(random.random()*10)*(10**i))
+        otp+=str(math.floor(random.random()*10))
     return otp
 
 def verify_code(code, user_dict):
@@ -136,9 +138,20 @@ def register(user: UserCreate, db = Depends(get_db)):
 
     user_dict = verify_code(user.access_code, user_dict)
 
+    message = Mail(
+    from_email='no-reply@ovismedical.com',
+    to_emails=user_dict["email"],
+    subject='One Time Password For Registration',
+    html_content='Here is the OTP for registration: ' + otp)
+    try:
+        sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
+        sg.send(message)
+    except Exception as e:
+        raise(e.message)
+
     users.insert_one({"user_id" : user.username, "user_dict": user_dict, "otp":hash_password(otp), "createdAt": creation})
     token = create_access_token({"sub": user.username})
-    return {"temp_token":token, "access_code": otp}
+    return {"temp_token":token}
 
 @loginrouter.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
@@ -160,7 +173,7 @@ async def get_info(user = Depends(get_user)):
     return user #aaa
 
 @loginrouter.put("/verify")
-async def verify(otp: int, token :str = Depends(oauth2_scheme), db = Depends(get_db)):
+async def verify(otp: str, token :str = Depends(oauth2_scheme), db = Depends(get_db)):
     users = db["temp_users"]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
