@@ -91,9 +91,20 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
             oncologist_level = conversation.get("oncologist_notification_level", "none")
             flag_for_oncologist = conversation.get("flag_for_oncologist", False)
             
+            # Extract triage data from 3-agent system
+            triage_assessment = conversation.get("triage_assessment", {})
+            alert_level = conversation.get("alert_level", "UNKNOWN")
+            potential_diagnoses = triage_assessment.get("potential_diagnoses", [])
+            recommended_timeline = triage_assessment.get("recommended_timeline", "")
+            clinical_notes = triage_assessment.get("clinical_notes", "")
+            
+            # Update summary to include alert level
+            if alert_level != "UNKNOWN":
+                summary_text = f"{summary_text} • Alert: {alert_level}"
+            
             assessment = {
                 "id": str(conversation.get("_id")),
-                "type": "florence_conversation",
+                "type": "florence_conversation_with_triage",
                 "date": conversation.get("created_at", "Unknown"),
                 "title": "Florence AI Chat",
                 "summary": summary_text,
@@ -106,12 +117,21 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                     "session_id": conversation.get("session_id"),
                     "assessment_summary": assessment_result,
                     "oncologist_notification_level": oncologist_level,
-                    "flag_for_oncologist": flag_for_oncologist
+                    "flag_for_oncologist": flag_for_oncologist,
+                    # New 3-agent triage data
+                    "alert_level": alert_level,
+                    "triage_assessment": triage_assessment,
+                    "potential_diagnoses": potential_diagnoses,
+                    "recommended_timeline": recommended_timeline,
+                    "clinical_notes": clinical_notes
                 },
                 "icon": "fa-robot",
                 "color": "#3b82f6",
                 "oncologist_notification_level": oncologist_level,
-                "flag_for_oncologist": flag_for_oncologist
+                "flag_for_oncologist": flag_for_oncologist,
+                # Top-level triage data for easy access
+                "alert_level": alert_level,
+                "potential_diagnoses_count": len(potential_diagnoses)
             }
             unified_assessments.append(assessment)
         

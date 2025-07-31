@@ -12,16 +12,10 @@ import openai
 from openai import OpenAI
 
 from .florence_utils import (
-    TARGET_SYMPTOMS,
-    PAIN_KEYWORDS,
-    ASSESSMENT_FUNCTION_SCHEMA,
-    ASSESSMENT_FUNCTION_SCHEMA_ZH,
-    create_timestamp,
     generate_fallback_response,
     format_conversation_history_for_ai,
     handle_ai_response_error,
-    load_florence_system_prompt,
-    should_flag_symptoms
+    load_florence_system_prompt
 )
 
 class FlorenceAI:
@@ -146,147 +140,7 @@ class FlorenceAI:
     
 # Note: Conversation state tracking simplified - AI now handles flow naturally
     
-    async def generate_structured_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str = "undergoing_treatment", session_language: str = "en") -> Dict[str, Any]:
-        """Generate a structured assessment using OpenAI function calling"""
-        if not self.client:
-            return {"error": "AI system not initialized"}
-        
-        try:
-            # Use the session language setting to determine report language
-            is_cantonese_report = session_language == "zh-HK"
-            
-            print(f"🔍 Session language: {session_language}, Using Cantonese report: {is_cantonese_report}")
-            
-            # Create assessment prompt based on selected session language
-            if is_cantonese_report:
-                # Translate treatment status to Cantonese
-                treatment_status_zh = "正在接受治療" if treatment_status == "undergoing_treatment" else "康復期"
-                
-                # Cantonese assessment prompt
-                assessment_prompt = f"""
-根據上面與病人 {patient_id} 的對話，請生成一份全面的結構化評估。
-
-病人目前狀況：{treatment_status_zh}
-
-對於每個症狀（咳嗽、噁心、食慾不振、疲勞、疼痛），請提供：
-- 頻率評級（1-5 級）：症狀發生的頻率
-- 嚴重程度評級（1-5 級）：症狀的嚴重程度
-- 關鍵指標：病人的直接引述或觀察
-- 附加註記：任何相關的背景資訊
-
-如果提到疼痛，也請包括位置。
-
-評估病人的情緒和整體狀況，並確定是否需要通知腫瘤科醫生。
-
-請使用提供的結構化格式返回評估結果，並確保所有文字內容都用繁體中文撰寫。
-                """
-            else:
-                # English assessment prompt
-                assessment_prompt = f"""
-            Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment.
-            
-            The patient is currently: {treatment_status}
-            
-            For each symptom (cough, nausea, lack_of_appetite, fatigue, pain), provide:
-            - Frequency rating (1-5 scale): How often the symptom occurs
-            - Severity rating (1-5 scale): How severe the symptom is
-            - Key indicators: Direct quotes or observations from the patient
-            - Additional notes: Any relevant context
-            
-            For pain, also include the location if mentioned.
-            
-            Assess the patient's mood and overall condition, and determine if oncologist notification is needed.
-            """
-            
-            # Format history for AI and add assessment request
-            ai_history = format_conversation_history_for_ai(conversation_history, include_system_prompt=False)
-            ai_history.append({"role": "user", "content": assessment_prompt})
-            
-            print(f"🔍 Making structured assessment API call with function calling...")
-            print(f"📝 Conversation length: {len(conversation_history)} messages")
-            print(f"👤 Patient ID: {patient_id}")
-            print(f"🏥 Treatment status: {treatment_status}")
-            print(f"🌐 Florence language setting: {self.language}")
-            print(f"🗣️ Report language: {'Cantonese' if is_cantonese_report else 'English'}")
-            
-            # Choose the appropriate function schema based on session language
-            function_schema = ASSESSMENT_FUNCTION_SCHEMA_ZH if is_cantonese_report else ASSESSMENT_FUNCTION_SCHEMA
-            
-            # Make API call with function calling
-            completion = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=ai_history,
-                temperature=self.temperature,
-                functions=[function_schema],
-                function_call={"name": "record_symptom_assessment"},
-                stream=False
-            )
-            
-            # Parse the function call response
-            if completion.choices[0].message.function_call:
-                print("✅ Got function call response from OpenAI")
-                function_args = json.loads(completion.choices[0].message.function_call.arguments)
-                print(f"📊 Function args received: {json.dumps(function_args, indent=2)}")
-                
-                # Add timestamp and patient_id if not provided
-                function_args["timestamp"] = create_timestamp()
-                function_args["patient_id"] = patient_id
-                
-                # Determine oncologist flagging
-                symptoms = function_args.get("symptoms", {})
-                should_flag, notification_level, flag_reason = should_flag_symptoms(symptoms, treatment_status)
-                
-                function_args["flag_for_oncologist"] = should_flag
-                function_args["oncologist_notification_level"] = notification_level
-                if should_flag:
-                    function_args["flag_reason"] = flag_reason
-                
-                print(f"🏁 Final structured assessment created with {len(symptoms)} symptoms")
-                return {
-                    "structured_assessment": function_args,
-                    "conversation_length": len(conversation_history)
-                }
-            else:
-                print("❌ No function call in OpenAI response, using fallback")
-                # Fallback if function calling fails
-                return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
-            
-        except Exception as e:
-            print(f"❌ Error generating structured assessment: {e}")
-            return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
-    
-    async def _generate_fallback_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str) -> Dict[str, Any]:
-        """Generate a fallback assessment when structured function calling fails"""
-        try:
-            # Create a simple structured assessment based on what we know
-            fallback_assessment = {
-                "timestamp": create_timestamp(),
-                "patient_id": patient_id,
-                "symptoms": {
-                    "cough": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "nausea": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "lack_of_appetite": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "fatigue": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "pain": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []}
-                },
-                "flag_for_oncologist": False,
-                "oncologist_notification_level": "none",
-                "treatment_status": treatment_status,
-                "mood_assessment": "Assessment completed through conversation with Florence",
-                "conversation_notes": f"Conversation with {len(conversation_history)} messages completed."
-            }
-            
-            return {
-                "structured_assessment": fallback_assessment,
-                "conversation_length": len(conversation_history)
-            }
-            
-        except Exception as e:
-            print(f"Error in fallback assessment: {e}")
-            return {
-                "error": str(e),
-                "structured_assessment": None
-            }
+# Assessment logic moved to florence_assessment.py
 
 # Global Florence instance
 florence_ai = FlorenceAI()
@@ -304,6 +158,4 @@ async def send_message_to_florence(message: str, conversation_history: List[Dict
     """Send a message to Florence and get response"""
     return await florence_ai.process_message(message, conversation_history)
 
-async def get_florence_structured_assessment(conversation_history: List[Dict], patient_id: str, treatment_status: str = "undergoing_treatment") -> Dict[str, Any]:
-    """Generate structured assessment using the telenurse format"""
-    return await florence_ai.generate_structured_assessment(conversation_history, patient_id, treatment_status) 
+# Assessment functions moved to florence_assessment.py 

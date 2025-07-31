@@ -12,8 +12,16 @@ from .florence_ai import (
     initialize_florence,
     start_florence_conversation,
     send_message_to_florence,
-    get_florence_structured_assessment,
     florence_ai
+)
+from .florence_assessment import (
+    initialize_florence_assessment,
+    get_florence_structured_assessment
+)
+from .florence_triage import (
+    initialize_florence_triage,
+    get_florence_triage_assessment,
+    get_alert_level_description
 )
 from .florence_utils import (
     create_timestamp,
@@ -282,28 +290,58 @@ async def finish_florence_session(
             del active_sessions[session_id]
             raise HTTPException(status_code=410, detail="Session has expired")
         
-        # Generate structured assessment
-        print(f"🔬 Starting assessment generation for session {session_id}")
+        # Generate structured assessment and triage assessment in parallel
+        print(f"🔬 Starting assessment and triage generation for session {session_id}")
         print(f"📝 Conversation has {len(session['conversation_history'])} messages")
         
-        # Ensure language is set correctly for assessment generation
+        # Initialize both modules if needed
+        api_key = os.getenv("OPENAI_API_KEY")
         session_language = session.get("language", "en")
-        florence_ai.set_language(session_language)
-        print(f"🌐 Set language to: {session_language}")
+        print(f"🌐 Using language: {session_language}")
         
-        assessment = await florence_ai.generate_structured_assessment(
+        # Initialize assessment module
+        if not await initialize_florence_assessment(api_key):
+            print("❌ Failed to initialize assessment module")
+        
+        # Initialize triage module  
+        if not await initialize_florence_triage(api_key):
+            print("❌ Failed to initialize triage module")
+        
+        # Run assessment and triage in parallel
+        print("🚀 Running assessment and triage in parallel...")
+        import asyncio
+        
+        assessment_task = get_florence_structured_assessment(
             session["conversation_history"],
             user["username"],
             session.get("treatment_status", "undergoing_treatment"),
-            session.get("language", "en")  # Pass the session language
+            session_language
         )
         
+        triage_task = get_florence_triage_assessment(
+            session["conversation_history"],
+            user["username"],
+            session.get("treatment_status", "undergoing_treatment"),
+            session_language
+        )
+        
+        # Wait for both to complete
+        assessment, triage = await asyncio.gather(assessment_task, triage_task)
+        
+        # Process assessment results
         print(f"🔍 Assessment generation result: {type(assessment)}")
         if assessment:
             print(f"📋 Assessment keys: {list(assessment.keys())}")
         
+        # Process triage results
+        print(f"🚨 Triage generation result: {type(triage)}")
+        if triage:
+            print(f"🚨 Triage keys: {list(triage.keys())}")
+        
         # Extract the structured assessment from the response
         structured_assessment = assessment.get("structured_assessment") if assessment else None
+        triage_assessment = triage.get("triage_assessment") if triage else None
+        alert_level = triage.get("alert_level", "UNKNOWN") if triage else "UNKNOWN"
         
         if structured_assessment:
             print(f"✅ Successfully extracted structured assessment")
@@ -320,8 +358,23 @@ async def finish_florence_session(
         else:
             print(f"❌ No structured assessment found in response")
         
-        # Create assessment record
-        assessment_record = create_assessment_record(session, structured_assessment)
+        if triage_assessment:
+            print(f"✅ Successfully extracted triage assessment")
+            print(f"🚨 Alert Level: {alert_level}")
+            if isinstance(triage_assessment, dict) and "potential_diagnoses" in triage_assessment:
+                diagnoses = triage_assessment["potential_diagnoses"]
+                print(f"🩺 Found {len(diagnoses)} potential diagnoses")
+                for i, diagnosis in enumerate(diagnoses, 1):
+                    condition = diagnosis.get("condition", "Unknown")
+                    likelihood = diagnosis.get("likelihood", "Unknown")
+                    print(f"  {i}. {condition} (Likelihood: {likelihood})")
+            timeline = triage_assessment.get("recommended_timeline", "Not specified")
+            print(f"⏰ Recommended timeline: {timeline}")
+        else:
+            print(f"❌ No triage assessment found in response")
+        
+        # Create assessment record with both assessment and triage data
+        assessment_record = create_assessment_record(session, structured_assessment, triage_assessment)
         
         print(f"📝 Created assessment record with keys: {list(assessment_record.keys())}")
         if "structured_assessment" in assessment_record and assessment_record["structured_assessment"]:
@@ -344,7 +397,10 @@ async def finish_florence_session(
         
         return {
             "message": "Session completed successfully",
-            "assessment": assessment
+            "assessment": assessment,
+            "triage": triage,
+            "alert_level": alert_level,
+            "alert_description": get_alert_level_description(alert_level, session_language)
         }
         
     except Exception as e:

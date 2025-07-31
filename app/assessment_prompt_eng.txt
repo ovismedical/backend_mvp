@@ -1,0 +1,13 @@
+Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment.
+
+The patient is currently: {treatment_status}
+
+For each symptom (cough, nausea, lack_of_appetite, fatigue, pain), provide:
+- Frequency rating (1-5 scale): How often the symptom occurs
+- Severity rating (1-5 scale): How severe the symptom is
+- Key indicators: Direct quotes or observations from the patient
+- Additional notes: Any relevant context
+
+For pain, also include the location if mentioned.
+
+Assess the patient's mood and overall condition, and determine if oncologist notification is needed. 
