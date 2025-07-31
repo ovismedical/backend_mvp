@@ -30,11 +30,13 @@ from .login import loginrouter, get_user, get_db
 from .doctor import doctorrouter
 from .questions import questionsrouter
 from .florence import florencerouter
+from .calendar import calendarrouter
 
 app.include_router(loginrouter)
 app.include_router(doctorrouter)
 app.include_router(questionsrouter)
 app.include_router(florencerouter)
+app.include_router(calendarrouter)
 
 @app.get("/unified_assessments")
 async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)):

@@ -170,7 +170,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)
 
 @loginrouter.get("/userinfo")
 async def get_info(user = Depends(get_user)):
-    return user #aaa
+    return user
 
 @loginrouter.put("/verify")
 async def verify(otp: str, token :str = Depends(oauth2_scheme), db = Depends(get_db)):
