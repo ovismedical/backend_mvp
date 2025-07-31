@@ -12,3 +12,5 @@ create_dummy_*.py
 *.db
 view_database.py
 json_history_viewer.py
+
+*.json
