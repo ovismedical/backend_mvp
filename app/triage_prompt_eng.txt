@@ -1,0 +1,30 @@
+Based on the conversation above with patient {patient_id}, please perform a clinical triage assessment to determine potential diagnoses and urgency level.
+
+Patient treatment status: {treatment_status}
+
+INSTRUCTIONS:
+1. Analyze the conversation for symptoms, severity, and patient responses
+2. Consider the patient's cancer treatment context and current status
+3. Identify potential diagnoses or conditions that may require attention
+4. Determine appropriate alert level based on clinical urgency
+5. Provide clear rationale for your assessment
+
+ALERT LEVEL CRITERIA:
+- GREEN: Routine symptoms, normal treatment side effects, stable condition
+- YELLOW: Moderate symptoms requiring monitoring, mild complications
+- ORANGE: Concerning symptoms requiring same-day medical review
+- RED: Severe symptoms requiring urgent medical attention
+
+FOCUS AREAS:
+- Treatment-related complications (infection, severe side effects)
+- Disease progression indicators
+- Emergency symptoms (fever, severe pain, breathing issues)
+- Psychological distress requiring intervention
+- Drug interactions or medication concerns
+
+Provide your assessment using the structured format with:
+- List of potential diagnoses/conditions
+- Alert level (GREEN/YELLOW/ORANGE/RED)
+- Clinical reasoning
+- Recommended timeline for medical review
+- Key symptoms that influenced the decision 

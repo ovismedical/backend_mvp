@@ -141,6 +141,126 @@ ASSESSMENT_FUNCTION_SCHEMA = {
     }
 }
 
+# Triage function schema for OpenAI function calling
+TRIAGE_FUNCTION_SCHEMA = {
+    "name": "record_triage_assessment",
+    "description": "Record a clinical triage assessment for a cancer patient based on conversation",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "timestamp": {
+                "type": "string",
+                "description": "Current date and time of the triage assessment"
+            },
+            "patient_id": {
+                "type": "string", 
+                "description": "Unique identifier for the patient"
+            },
+            "potential_diagnoses": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "condition": {"type": "string", "description": "Potential diagnosis or condition"},
+                        "likelihood": {"type": "string", "enum": ["low", "moderate", "high"], "description": "Likelihood of this condition"},
+                        "rationale": {"type": "string", "description": "Clinical reasoning for this diagnosis"}
+                    },
+                    "required": ["condition", "likelihood", "rationale"]
+                },
+                "description": "List of potential diagnoses or conditions"
+            },
+            "alert_level": {
+                "type": "string",
+                "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
+                "description": "Clinical urgency level"
+            },
+            "alert_rationale": {
+                "type": "string",
+                "description": "Clinical reasoning for the assigned alert level"
+            },
+            "key_symptoms": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Key symptoms that influenced the triage decision"
+            },
+            "recommended_timeline": {
+                "type": "string",
+                "description": "Recommended timeline for medical review (e.g., 'immediate', 'within 24 hours', 'routine follow-up')"
+            },
+            "clinical_notes": {
+                "type": "string", 
+                "description": "Additional clinical observations or concerns"
+            },
+            "treatment_status": {
+                "type": "string",
+                "enum": ["undergoing_treatment", "in_remission"],
+                "description": "Patient's current treatment status"
+            }
+        },
+        "required": ["timestamp", "patient_id", "potential_diagnoses", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "treatment_status"]
+    }
+}
+
+# Cantonese version of the triage function schema
+TRIAGE_FUNCTION_SCHEMA_ZH = {
+    "name": "record_triage_assessment",
+    "description": "根據對話為癌症患者記錄臨床分流評估",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "timestamp": {
+                "type": "string",
+                "description": "分流評估的當前日期和時間"
+            },
+            "patient_id": {
+                "type": "string",
+                "description": "病人的唯一標識符"
+            },
+            "potential_diagnoses": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "condition": {"type": "string", "description": "潛在診斷或病況"},
+                        "likelihood": {"type": "string", "enum": ["low", "moderate", "high"], "description": "此病況的可能性"},
+                        "rationale": {"type": "string", "description": "此診斷的臨床推理"}
+                    },
+                    "required": ["condition", "likelihood", "rationale"]
+                },
+                "description": "潛在診斷或病況清單"
+            },
+            "alert_level": {
+                "type": "string",
+                "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
+                "description": "臨床緊急程度級別"
+            },
+            "alert_rationale": {
+                "type": "string",
+                "description": "指定警報級別的臨床推理"
+            },
+            "key_symptoms": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "影響分流決定的關鍵症狀"
+            },
+            "recommended_timeline": {
+                "type": "string",
+                "description": "建議的醫療檢查時間表（例如：'立即'、'24小時內'、'常規隨訪'）"
+            },
+            "clinical_notes": {
+                "type": "string",
+                "description": "額外的臨床觀察或關注"
+            },
+            "treatment_status": {
+                "type": "string",
+                "enum": ["undergoing_treatment", "in_remission"],
+                "description": "病人的當前治療狀態"
+            }
+        },
+        "required": ["timestamp", "patient_id", "potential_diagnoses", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "treatment_status"]
+    }
+}
+
 # Cantonese version of the assessment function schema
 ASSESSMENT_FUNCTION_SCHEMA_ZH = {
     "name": "record_symptom_assessment",
@@ -378,8 +498,31 @@ def is_ai_available() -> bool:
     """Check if AI functionality is available"""
     return os.getenv("OPENAI_API_KEY") is not None
 
-def create_assessment_record(session_data: Dict, structured_assessment: Optional[Dict] = None) -> Dict[str, Any]:
-    """Create standardized assessment record for database storage using the structured format"""
+def create_assessment_record(session_data: Dict, structured_assessment: Optional[Dict] = None, triage_assessment: Optional[Dict] = None) -> Dict[str, Any]:
+    """Create standardized assessment record for database storage using the structured format with triage data"""
+    
+    # Extract alert level from triage assessment
+    alert_level = "UNKNOWN"
+    if triage_assessment:
+        alert_level = triage_assessment.get("alert_level", "UNKNOWN")
+    
+    # Determine overall oncologist notification level (use highest priority from assessment or triage)
+    oncologist_notification = "none"
+    flag_for_oncologist = False
+    
+    if structured_assessment:
+        oncologist_notification = structured_assessment.get("oncologist_notification_level", "none")
+        flag_for_oncologist = structured_assessment.get("flag_for_oncologist", False)
+    
+    # Triage alert levels can override assessment notification levels
+    if triage_assessment:
+        triage_alert = triage_assessment.get("alert_level", "UNKNOWN")
+        if triage_alert in ["RED", "ORANGE"]:
+            flag_for_oncologist = True
+            oncologist_notification = "red" if triage_alert == "RED" else "amber"
+        elif triage_alert == "YELLOW" and oncologist_notification == "none":
+            oncologist_notification = "amber"
+    
     return {
         "session_id": session_data["session_id"],
         "user_id": session_data["user_id"],
@@ -387,14 +530,16 @@ def create_assessment_record(session_data: Dict, structured_assessment: Optional
         "language": session_data.get("language", "en"),
         "input_mode": session_data.get("input_mode", "keyboard"),
         "conversation_history": session_data["conversation_history"],
-        "structured_assessment": structured_assessment,  # New structured format
+        "structured_assessment": structured_assessment,  # Symptom assessment
+        "triage_assessment": triage_assessment,  # Clinical triage assessment
+        "alert_level": alert_level,  # Triage alert level
         "created_at": session_data["created_at"],
         "completed_at": session_data.get("completed_at", create_timestamp()),
-        "assessment_type": "florence_conversation",
+        "assessment_type": "florence_conversation_with_triage",  # Updated type
         "florence_state": session_data.get("florence_state", "completed"),
         "ai_powered": session_data.get("ai_available", False),
-        "oncologist_notification_level": structured_assessment.get("oncologist_notification_level", "none") if structured_assessment else "none",
-        "flag_for_oncologist": structured_assessment.get("flag_for_oncologist", False) if structured_assessment else False
+        "oncologist_notification_level": oncologist_notification,
+        "flag_for_oncologist": flag_for_oncologist
     }
 
 def create_session_response_data(session_data: Dict) -> Dict[str, Any]:
