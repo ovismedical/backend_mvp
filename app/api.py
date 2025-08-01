@@ -94,7 +94,9 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
             # Extract triage data from 3-agent system
             triage_assessment = conversation.get("triage_assessment", {})
             alert_level = conversation.get("alert_level", "UNKNOWN")
-            potential_diagnoses = triage_assessment.get("potential_diagnoses", [])
+            diagnosis_predictions = triage_assessment.get("diagnosis_predictions", [])
+            clinical_reasoning = triage_assessment.get("clinical_reasoning", "")
+            confidence_level = triage_assessment.get("confidence_level", "")
             recommended_timeline = triage_assessment.get("recommended_timeline", "")
             clinical_notes = triage_assessment.get("clinical_notes", "")
             
@@ -121,7 +123,9 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                     # New 3-agent triage data
                     "alert_level": alert_level,
                     "triage_assessment": triage_assessment,
-                    "potential_diagnoses": potential_diagnoses,
+                    "diagnosis_predictions": diagnosis_predictions,
+                    "clinical_reasoning": clinical_reasoning,
+                    "confidence_level": confidence_level,
                     "recommended_timeline": recommended_timeline,
                     "clinical_notes": clinical_notes
                 },
@@ -131,7 +135,7 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                 "flag_for_oncologist": flag_for_oncologist,
                 # Top-level triage data for easy access
                 "alert_level": alert_level,
-                "potential_diagnoses_count": len(potential_diagnoses)
+                "diagnosis_predictions_count": len(diagnosis_predictions)
             }
             unified_assessments.append(assessment)
         

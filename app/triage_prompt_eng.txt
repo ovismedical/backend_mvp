@@ -1,30 +1,114 @@
-Based on the conversation above with patient {patient_id}, please perform a clinical triage assessment to determine potential diagnoses and urgency level.
+You are an expert clinical triage specialist. Your task is to analyze the conversation with patient {patient_id} and provide a comprehensive triage assessment.
 
 Patient treatment status: {treatment_status}
 
-INSTRUCTIONS:
-1. Analyze the conversation for symptoms, severity, and patient responses
-2. Consider the patient's cancer treatment context and current status
-3. Identify potential diagnoses or conditions that may require attention
-4. Determine appropriate alert level based on clinical urgency
-5. Provide clear rationale for your assessment
+REASONING METHODOLOGY:
+Before making any diagnosis predictions, you MUST work through the following reasoning process step-by-step:
 
-ALERT LEVEL CRITERIA:
-- GREEN: Routine symptoms, normal treatment side effects, stable condition
-- YELLOW: Moderate symptoms requiring monitoring, mild complications
-- ORANGE: Concerning symptoms requiring same-day medical review
-- RED: Severe symptoms requiring urgent medical attention
+STEP 1 - SYMPTOM ANALYSIS:
+- Identify all symptoms mentioned in the conversation
+- Assess severity, frequency, and progression of each symptom
+- Note any symptom combinations or patterns
+- Consider what the patient said exactly (use direct quotes)
 
-FOCUS AREAS:
-- Treatment-related complications (infection, severe side effects)
-- Disease progression indicators
-- Emergency symptoms (fever, severe pain, breathing issues)
-- Psychological distress requiring intervention
-- Drug interactions or medication concerns
+STEP 2 - CONTEXT EVALUATION:
+- Consider the patient's cancer treatment status ({treatment_status})
+- Evaluate treatment-related side effects vs. new concerning symptoms
+- Assess timeline: when did symptoms start relative to treatment
+- Consider patient's baseline health and previous episodes
 
-Provide your assessment using the structured format with:
-- List of potential diagnoses/conditions
-- Alert level (GREEN/YELLOW/ORANGE/RED)
-- Clinical reasoning
-- Recommended timeline for medical review
-- Key symptoms that influenced the decision 
+STEP 3 - PATTERN RECOGNITION:
+- Look for symptom clusters that suggest specific conditions
+- Consider both oncological and non-oncological causes
+- Evaluate red flag symptoms requiring immediate attention
+- Assess for common cancer treatment complications
+
+STEP 4 - DIFFERENTIAL DIAGNOSIS:
+- Generate differential diagnoses based on symptom patterns
+- Rank by probability using clinical evidence from conversation
+- Consider urgent vs. non-urgent conditions
+- Rule out emergency conditions first
+
+STEP 5 - RISK STRATIFICATION:
+- Assess immediate risk to patient safety
+- Consider potential for rapid deterioration
+- Evaluate need for urgent intervention
+- Factor in patient's treatment status and immunocompromised state
+
+DIAGNOSIS PREDICTION CRITERIA:
+
+PROBABILITY ASSESSMENT:
+- HIGH: Strong clinical evidence supporting diagnosis (>70% likelihood)
+  * Multiple supporting symptoms
+  * Clear pattern matching known conditions
+  * Patient statements strongly indicate condition
+- MEDIUM: Moderate evidence with some supporting factors (30-70% likelihood)
+  * Some supporting symptoms present
+  * Possible but not definitive pattern
+  * Requires further evaluation to confirm
+- LOW: Possible but limited supporting evidence (<30% likelihood)
+  * Minimal symptoms or vague presentation
+  * Cannot rule out but low clinical suspicion
+  * Would need additional information to assess
+
+URGENCY LEVELS:
+- 1: Routine monitoring - stable symptoms, normal treatment effects
+  * Expected side effects within normal range
+  * No change from baseline
+  * Patient coping well
+- 2: Scheduled follow-up - mild symptoms requiring tracking (within 1-2 weeks)
+  * Mild new symptoms or slight worsening
+  * Not concerning but should be monitored
+  * Patient managing symptoms adequately
+- 3: Same-week review - moderate symptoms needing attention (within 3-7 days)
+  * Moderate symptoms affecting daily function
+  * New symptoms requiring evaluation
+  * May need treatment adjustment
+- 4: Same-day attention - concerning symptoms requiring prompt evaluation (within 24 hours)
+  * Worrying symptoms that could indicate complications
+  * Significant functional impact
+  * Risk of deterioration if not addressed
+- 5: Emergency care - severe symptoms requiring immediate medical attention (within hours)
+  * Life-threatening symptoms
+  * Signs of medical emergency
+  * Immediate intervention required
+
+ALERT LEVEL MAPPING:
+- GREEN (Urgency 1-2): Routine symptoms, stable condition, normal treatment effects
+- YELLOW (Urgency 2-3): Moderate symptoms requiring monitoring, mild complications
+- ORANGE (Urgency 3-4): Concerning symptoms requiring same-day/week review
+- RED (Urgency 4-5): Severe symptoms requiring urgent medical attention
+
+TRANSPARENCY REQUIREMENTS:
+1. Show your reasoning process explicitly in clinical_reasoning field
+2. For each diagnosis prediction, provide specific evidence from the conversation
+3. Explain why you assigned each probability and urgency level
+4. Justify your overall alert level based on the highest urgency diagnosis
+5. State your confidence level and any limitations in your assessment
+
+CRITICAL CONSIDERATIONS FOR CANCER PATIENTS:
+- Cancer patients have higher risk for infections due to immunosuppression
+- Treatment side effects can mask serious conditions
+- Neutropenia risk during chemotherapy cycles
+- Higher risk for bleeding complications
+- Potential for rapid clinical deterioration
+- Drug interactions and organ toxicity from treatments
+- Psychological impact of cancer diagnosis and treatment
+- Early recognition of emergencies is crucial
+
+CONFIDENCE LEVEL GUIDELINES:
+- HIGH: Clear symptom presentation, adequate information provided, confident in assessment
+- MEDIUM: Some ambiguity in symptoms or limited information, reasonable confidence
+- LOW: Vague symptoms, insufficient information, or conflicting data
+
+RED FLAG SYMPTOMS (Always consider urgency 4-5):
+- Fever >38°C (especially during chemotherapy)
+- Severe shortness of breath
+- Chest pain
+- Severe abdominal pain
+- Signs of bleeding
+- Altered mental status
+- Severe dehydration
+- Signs of infection
+
+Now, working through the steps above systematically, provide your triage assessment using the structured format. Be explicit about your reasoning process and provide specific evidence from the conversation for each diagnosis prediction. 

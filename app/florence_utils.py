@@ -144,7 +144,7 @@ ASSESSMENT_FUNCTION_SCHEMA = {
 # Triage function schema for OpenAI function calling
 TRIAGE_FUNCTION_SCHEMA = {
     "name": "record_triage_assessment",
-    "description": "Record a clinical triage assessment for a cancer patient based on conversation",
+    "description": "Record a clinical triage assessment with step-by-step reasoning and structured diagnosis predictions",
     "parameters": {
         "type": "object",
         "properties": {
@@ -156,27 +156,47 @@ TRIAGE_FUNCTION_SCHEMA = {
                 "type": "string", 
                 "description": "Unique identifier for the patient"
             },
-            "potential_diagnoses": {
+            "clinical_reasoning": {
+                "type": "string",
+                "description": "Detailed step-by-step clinical reasoning process. Think through: 1) Key symptoms identified, 2) Pattern recognition, 3) Differential diagnosis considerations, 4) Risk stratification factors, 5) Treatment context implications"
+            },
+            "diagnosis_predictions": {
                 "type": "array",
+                "description": "List of diagnosis predictions with structured assessment",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "condition": {"type": "string", "description": "Potential diagnosis or condition"},
-                        "likelihood": {"type": "string", "enum": ["low", "moderate", "high"], "description": "Likelihood of this condition"},
-                        "rationale": {"type": "string", "description": "Clinical reasoning for this diagnosis"}
+                        "suspected_diagnosis": {
+                            "type": "string",
+                            "description": "Name of the suspected medical condition or diagnosis"
+                        },
+                        "probability": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"],
+                            "description": "Probability assessment based on clinical evidence"
+                        },
+                        "urgency": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                            "description": "Urgency level: 1=routine monitoring, 2=scheduled follow-up, 3=same-week review, 4=same-day attention, 5=immediate emergency care"
+                        },
+                        "reasoning": {
+                            "type": "string",
+                            "description": "Detailed clinical reasoning supporting this specific diagnosis prediction"
+                        }
                     },
-                    "required": ["condition", "likelihood", "rationale"]
-                },
-                "description": "List of potential diagnoses or conditions"
+                    "required": ["suspected_diagnosis", "probability", "urgency", "reasoning"]
+                }
             },
             "alert_level": {
                 "type": "string",
                 "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
-                "description": "Clinical urgency level"
+                "description": "Overall clinical urgency level based on highest urgency diagnosis"
             },
             "alert_rationale": {
                 "type": "string",
-                "description": "Clinical reasoning for the assigned alert level"
+                "description": "Clear reasoning for the assigned alert level"
             },
             "key_symptoms": {
                 "type": "array",
@@ -185,7 +205,12 @@ TRIAGE_FUNCTION_SCHEMA = {
             },
             "recommended_timeline": {
                 "type": "string",
-                "description": "Recommended timeline for medical review (e.g., 'immediate', 'within 24 hours', 'routine follow-up')"
+                "description": "Specific recommended timeline for medical review"
+            },
+            "confidence_level": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "Overall confidence in the triage assessment"
             },
             "clinical_notes": {
                 "type": "string", 
@@ -197,14 +222,14 @@ TRIAGE_FUNCTION_SCHEMA = {
                 "description": "Patient's current treatment status"
             }
         },
-        "required": ["timestamp", "patient_id", "potential_diagnoses", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "treatment_status"]
+        "required": ["timestamp", "patient_id", "clinical_reasoning", "diagnosis_predictions", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "confidence_level", "treatment_status"]
     }
 }
 
 # Cantonese version of the triage function schema
 TRIAGE_FUNCTION_SCHEMA_ZH = {
     "name": "record_triage_assessment",
-    "description": "根據對話為癌症患者記錄臨床分流評估",
+    "description": "記錄臨床分流評估，包含逐步推理過程和結構化診斷預測",
     "parameters": {
         "type": "object",
         "properties": {
@@ -213,30 +238,50 @@ TRIAGE_FUNCTION_SCHEMA_ZH = {
                 "description": "分流評估的當前日期和時間"
             },
             "patient_id": {
-                "type": "string",
-                "description": "病人的唯一標識符"
+                "type": "string", 
+                "description": "病人的唯一識別碼"
             },
-            "potential_diagnoses": {
+            "clinical_reasoning": {
+                "type": "string",
+                "description": "詳細的逐步臨床推理過程。思考：1) 識別的關鍵症狀，2) 模式識別，3) 鑑別診斷考慮，4) 風險分層因素，5) 治療背景影響"
+            },
+            "diagnosis_predictions": {
                 "type": "array",
+                "description": "結構化評估的診斷預測清單",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "condition": {"type": "string", "description": "潛在診斷或病況"},
-                        "likelihood": {"type": "string", "enum": ["low", "moderate", "high"], "description": "此病況的可能性"},
-                        "rationale": {"type": "string", "description": "此診斷的臨床推理"}
+                        "suspected_diagnosis": {
+                            "type": "string",
+                            "description": "疑似醫療病況或診斷的名稱"
+                        },
+                        "probability": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"],
+                            "description": "基於臨床證據的機率評估"
+                        },
+                        "urgency": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                            "description": "緊急程度級別：1=常規監察，2=計劃追蹤，3=同週檢查，4=當日關注，5=立即急救護理"
+                        },
+                        "reasoning": {
+                            "type": "string",
+                            "description": "支持此特定診斷預測的詳細臨床推理"
+                        }
                     },
-                    "required": ["condition", "likelihood", "rationale"]
-                },
-                "description": "潛在診斷或病況清單"
+                    "required": ["suspected_diagnosis", "probability", "urgency", "reasoning"]
+                }
             },
             "alert_level": {
                 "type": "string",
                 "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
-                "description": "臨床緊急程度級別"
+                "description": "基於最高緊急程度診斷的整體臨床緊急級別"
             },
             "alert_rationale": {
                 "type": "string",
-                "description": "指定警報級別的臨床推理"
+                "description": "指定警報級別的清晰推理"
             },
             "key_symptoms": {
                 "type": "array",
@@ -245,19 +290,24 @@ TRIAGE_FUNCTION_SCHEMA_ZH = {
             },
             "recommended_timeline": {
                 "type": "string",
-                "description": "建議的醫療檢查時間表（例如：'立即'、'24小時內'、'常規隨訪'）"
+                "description": "建議的醫療檢查具體時間表"
+            },
+            "confidence_level": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "分流評估的整體信心水平"
             },
             "clinical_notes": {
-                "type": "string",
-                "description": "額外的臨床觀察或關注"
+                "type": "string", 
+                "description": "額外的臨床觀察或關注事項"
             },
             "treatment_status": {
                 "type": "string",
                 "enum": ["undergoing_treatment", "in_remission"],
-                "description": "病人的當前治療狀態"
+                "description": "病人當前的治療狀況"
             }
         },
-        "required": ["timestamp", "patient_id", "potential_diagnoses", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "treatment_status"]
+        "required": ["timestamp", "patient_id", "clinical_reasoning", "diagnosis_predictions", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "confidence_level", "treatment_status"]
     }
 }
 

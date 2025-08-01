@@ -43,7 +43,11 @@ class FlorenceAI:
         try:
             if api_key:
                 print(f"🔑 Initializing with provided API key: {api_key[:10]}...")
-                self.client = OpenAI(api_key=api_key)
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=60.0,  # Increase timeout for VPN
+                    max_retries=3
+                )
             else:
                 # Try to get from environment
                 api_key = os.getenv("OPENAI_API_KEY")
@@ -51,7 +55,11 @@ class FlorenceAI:
                     print("❌ No OpenAI API key found")
                     raise ValueError("OpenAI API key not provided")
                 print(f"🔑 Using hardcoded API key: {api_key[:10]}...")
-                self.client = OpenAI(api_key=api_key)
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=60.0,  # Increase timeout for VPN
+                    max_retries=3
+                )
             print("✅ OpenAI client initialized successfully")
             return True
         except Exception as e:

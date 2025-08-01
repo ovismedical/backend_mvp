@@ -31,7 +31,11 @@ class FlorenceTriage:
         try:
             if api_key:
                 print(f"🔑 Initializing Triage module with provided API key: {api_key[:10]}...")
-                self.client = OpenAI(api_key=api_key)
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=60.0,  # Increase timeout for VPN
+                    max_retries=3
+                )
             else:
                 # Try to get from environment
                 api_key = os.getenv("OPENAI_API_KEY")
@@ -39,7 +43,11 @@ class FlorenceTriage:
                     print("❌ No OpenAI API key found for triage")
                     raise ValueError("OpenAI API key not provided")
                 print(f"🔑 Triage module using environment API key: {api_key[:10]}...")
-                self.client = OpenAI(api_key=api_key)
+                self.client = OpenAI(
+                    api_key=api_key,
+                    timeout=60.0,  # Increase timeout for VPN
+                    max_retries=3
+                )
             print("✅ Triage client initialized successfully")
             return True
         except Exception as e:
