@@ -329,10 +329,9 @@ async def finish_florence_session(
             print(f"❌ Failed to save assessment: {e}")
             raise HTTPException(status_code=500, detail="Failed to save assessment")
         
-        # Mark session as completed in global dictionary
+        # Mark session as completed
         session["status"] = "completed"
         session["completed_at"] = create_timestamp()
-        session["structured_assessment"] = structured_assessment
         
         return {
             "message": "Session completed successfully",
@@ -349,37 +348,11 @@ async def test_florence_endpoint():
     # Test if OpenAI is available using shared utility
     openai_available = is_ai_available()
     
-    # Get session statistics from global dictionary
-    session_stats = {
-        "active_sessions": len(active_sessions),
-        "session_ids": list(active_sessions.keys())
-    }
-    
     return {
         "status": "ok",
         "message": "Florence module is working!",
         "timestamp": create_timestamp(),
-        "session_stats": session_stats,
+        "active_sessions": len(active_sessions),
         "openai_available": openai_available,
         "ai_enabled": openai_available
     }
-
-@florencerouter.post("/cleanup")
-async def cleanup_expired_sessions_endpoint():
-    """Clean up expired sessions (admin endpoint)"""
-    try:
-        initial_count = len(active_sessions)
-        cleanup_expired_sessions()
-        final_count = len(active_sessions)
-        count = initial_count - final_count
-        
-        return {
-            "message": f"Cleaned up {count} expired sessions",
-            "count": count,
-            "timestamp": create_timestamp()
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to cleanup sessions: {str(e)}"
-        ) 
