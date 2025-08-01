@@ -12,10 +12,6 @@ from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient, ASCENDING
 from dotenv import load_dotenv
 from typing import Annotated
-import random
-import math
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 
 
 # Load .env from current directory
@@ -88,11 +84,6 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
         raise credentials_exception
     return jsonable_encoder(user)
 
-def gen_otp():
-    otp = ""
-    for i in range(4):
-        otp+=str(math.floor(random.random()*10))
-    return otp
 
 def verify_code(code, user_dict):
     db = get_db()
@@ -110,48 +101,7 @@ def verify_code(code, user_dict):
         return new_user
     raise HTTPException(status_code=400, detail="Invalid access code")
 
-@loginrouter.post("/configure_db")
-def startup(db = Depends(get_db)):
-    temp_users = db["temp_users"]
-    temp_users.drop()
-    temp_users.create_index(
-        [("createdAt", ASCENDING)],
-        expireAfterSeconds=300 
-    )
-    return "success"
 
-@loginrouter.post("/register")
-def register(user: UserCreate, db = Depends(get_db)):
-    users = db["temp_users"]
-    registered = db["users"]
-    if users.find_one({"user_id": user.username}) or registered.find_one({"username":user.username}):
-        raise HTTPException(status_code=400, detail="User already exists")
-    hashed = hash_password(user.password)
-    
-    # Convert to dict and add additional fields
-    user_dict = user.dict()
-    user_dict["password"] = hashed
-    
-    otp = gen_otp()
-
-    creation = datetime.now(tz = timezone.utc)
-
-    user_dict = verify_code(user.access_code, user_dict)
-
-    message = Mail(
-    from_email='no-reply@ovismedical.com',
-    to_emails=user_dict["email"],
-    subject='One Time Password For Registration',
-    html_content='Here is the OTP for registration: ' + otp)
-    try:
-        sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
-        sg.send(message)
-    except Exception as e:
-        raise(e.message)
-
-    users.insert_one({"user_id" : user.username, "user_dict": user_dict, "otp":hash_password(otp), "createdAt": creation})
-    token = create_access_token({"sub": user.username})
-    return {"temp_token":token}
 
 @loginrouter.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
@@ -167,38 +117,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)
         token = create_access_token({"sub": user["username"]})
         return {"access_token": token, "token_type": "Bearer"}
     return ({"details":"Invalid credentials"}) 
+    
 
 @loginrouter.get("/userinfo")
 async def get_info(user = Depends(get_user)):
     return user
 
-@loginrouter.put("/verify")
-async def verify(otp: str, token :str = Depends(oauth2_scheme), db = Depends(get_db)):
-    users = db["temp_users"]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        temp = payload.get("exp")
-        if username is None:
-            raise credentials_exception
-        if temp is None:
-            raise credentials_exception
-        exp = datetime.fromtimestamp(temp, tz=timezone.utc)
-        if exp < datetime.now(tz = timezone.utc):
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    user = users.find_one({"user_id": username})
-    if not user:
-        raise credentials_exception
-    if verify_password(otp, user["otp"]):
-        if user["user_dict"]["isDoctor"]:
-            db["doctors"].insert_one(user["user_dict"])
-            users.delete_one({"user_id": username})
-            return ({"msg": "Doctor succesfully created. Please login to continue."})
-        else:
-            db["users"].insert_one(user["user_dict"])
-            users.delete_one({"user_id": username})
-            return ({"msg": "User succesfully created. Please login to continue."})
-    else:
-        raise credentials_exception

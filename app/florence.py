@@ -260,28 +260,20 @@ async def send_message_to_florence_endpoint(
 @florencerouter.post("/finish_session/{session_id}")
 async def finish_florence_session(
     session_id: str,
-    user: Dict = Depends(get_user)
+    user: Dict = Depends(get_user),
+    db = Depends(get_db)
 ):
     """Finish a Florence session and save the assessment"""
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-        
+    
     session = active_sessions[session_id]
     
-    # Validate session access
+    # Verify user owns this session using shared utility
     if not validate_session_access(session, user["username"]):
-        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+        raise HTTPException(status_code=403, detail="Access denied")
     
     try:
-        # Check if session has expired
-        current_time = datetime.now(timezone.utc)
-        created_at = datetime.fromisoformat(session["created_at"].replace('Z', '+00:00'))
-        time_diff = (current_time - created_at).total_seconds()
-        
-        if time_diff > SESSION_EXPIRY:
-            del active_sessions[session_id]
-            raise HTTPException(status_code=410, detail="Session has expired")
-        
         # Generate structured assessment
         print(f"🔬 Starting assessment generation for session {session_id}")
         print(f"📝 Conversation has {len(session['conversation_history'])} messages")
@@ -331,16 +323,16 @@ async def finish_florence_session(
         
         # Save to database
         try:
-            db = get_db()
             db.florence_assessments.insert_one(assessment_record)
             print(f"✅ Saved assessment for session {session_id}")
         except Exception as e:
             print(f"❌ Failed to save assessment: {e}")
             raise HTTPException(status_code=500, detail="Failed to save assessment")
         
-        # Mark session as completed
+        # Mark session as completed in global dictionary
         session["status"] = "completed"
         session["completed_at"] = create_timestamp()
+        session["structured_assessment"] = structured_assessment
         
         return {
             "message": "Session completed successfully",
@@ -357,11 +349,37 @@ async def test_florence_endpoint():
     # Test if OpenAI is available using shared utility
     openai_available = is_ai_available()
     
+    # Get session statistics from global dictionary
+    session_stats = {
+        "active_sessions": len(active_sessions),
+        "session_ids": list(active_sessions.keys())
+    }
+    
     return {
         "status": "ok",
         "message": "Florence module is working!",
         "timestamp": create_timestamp(),
-        "active_sessions": len(active_sessions),
+        "session_stats": session_stats,
         "openai_available": openai_available,
         "ai_enabled": openai_available
-    } 
+    }
+
+@florencerouter.post("/cleanup")
+async def cleanup_expired_sessions_endpoint():
+    """Clean up expired sessions (admin endpoint)"""
+    try:
+        initial_count = len(active_sessions)
+        cleanup_expired_sessions()
+        final_count = len(active_sessions)
+        count = initial_count - final_count
+        
+        return {
+            "message": f"Cleaned up {count} expired sessions",
+            "count": count,
+            "timestamp": create_timestamp()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cleanup sessions: {str(e)}"
+        ) 

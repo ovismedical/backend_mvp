@@ -1,71 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-import os
+from fastapi import APIRouter, Depends, HTTPException
 from .login import get_db, UserCreate, hash_password, verify_code
-from .otp_system import OTPManager, OTPRequest, OTPVerification, OTPStatus
+from .twilio_verify import get_verify_service, TwilioVerifyService
 from datetime import datetime, timezone
+from pydantic import BaseModel, EmailStr
 
 otprouter = APIRouter(prefix="/otp", tags=["otp"])
 
-def get_otp_manager(db = Depends(get_db)) -> OTPManager:
-    """Dependency to get OTP manager instance"""
-    return OTPManager(db)
+# Pydantic models for Twilio Verify OTP
+class OTPRequest(BaseModel):
+    user_id: str
+    email: EmailStr
+    purpose: str = "registration"
 
-def send_otp_email(email: str, otp_code: str, purpose: str = "registration"):
-    """Send OTP via email using SendGrid"""
-    try:
-        sg = SendGridAPIClient(api_key=os.getenv('SENDGRID_API_KEY'))
-        
-        subject_map = {
-            "registration": "Complete Your Registration - OTP Code",
-            "password_reset": "Password Reset - OTP Code",
-            "login_verification": "Login Verification - OTP Code"
-        }
-        
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333;">Your OTP Code</h2>
-            <p>Your one-time password (OTP) code is:</p>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                <h1 style="color: #007bff; font-size: 32px; margin: 0; letter-spacing: 5px;">{otp_code}</h1>
-            </div>
-            <p><strong>Important:</strong></p>
-            <ul>
-                <li>This code expires in 10 minutes</li>
-                <li>Do not share this code with anyone</li>
-                <li>If you didn't request this code, please ignore this email</li>
-            </ul>
-            <p style="color: #666; font-size: 14px;">
-                This is an automated message from OVIS Medical. Please do not reply to this email.
-            </p>
-        </div>
-        """
-        
-        message = Mail(
-            from_email='no-reply@ovismedical.com',
-            to_emails=email,
-            subject=subject_map.get(purpose, "OTP Verification Code"),
-            html_content=html_content
-        )
-        
-        response = sg.send(message)
-        return response.status_code == 202
-        
-    except Exception as e:
-        print(f"Failed to send OTP email: {e}")
-        return False
+class OTPVerification(BaseModel):
+    user_id: str
+    email: EmailStr
+    otp_code: str
+    purpose: str = "registration"
 
 @otprouter.post("/register")
 async def register_with_otp(
     user: UserCreate, 
-    background_tasks: BackgroundTasks,
     db = Depends(get_db),
-    otp_manager: OTPManager = Depends(get_otp_manager)
+    verify_service: TwilioVerifyService = Depends(get_verify_service)
 ):
     """
-    Register user and send OTP for verification
-    Replaces the original register endpoint with improved OTP flow
+    Register user and send OTP via Twilio Verify
+    Uses Twilio's enterprise-grade OTP service with built-in rate limiting
     """
     try:
         # Check if user already exists
@@ -94,20 +55,18 @@ async def register_with_otp(
         
         temp_users_collection.insert_one(temp_user_doc)
         
-        # Generate and send OTP
-        otp_code = otp_manager.create_otp(
-            user_id=user.username,
+        # Send OTP via Twilio Verify
+        verification_result = verify_service.send_verification_email(
             email=user.email,
             purpose="registration"
         )
-        
-        # Send email in background
-        background_tasks.add_task(send_otp_email, user.email, otp_code, "registration")
         
         return {
             "message": "Registration initiated. Please check your email for the OTP code.",
             "user_id": user.username,
             "email": user.email,
+            "verification_sid": verification_result["verification_sid"],
+            "status": verification_result["status"],
             "expires_in_minutes": 10
         }
         
@@ -123,23 +82,22 @@ async def register_with_otp(
 async def verify_otp(
     verification: OTPVerification,
     db = Depends(get_db),
-    otp_manager: OTPManager = Depends(get_otp_manager)
+    verify_service: TwilioVerifyService = Depends(get_verify_service)
 ):
     """
-    Verify OTP and complete user registration
+    Verify OTP using Twilio Verify and complete user registration
     """
     try:
-        # Verify OTP
-        is_valid = otp_manager.verify_otp(
-            user_id=verification.user_id,
-            otp_code=verification.otp_code,
-            purpose=verification.purpose
+        # Verify OTP with Twilio
+        verification_result = verify_service.verify_code(
+            email=verification.email,
+            code=verification.otp_code
         )
         
-        if not is_valid:
+        if not verification_result["success"]:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid OTP code. Please check and try again."
+                detail=f"Invalid OTP code: {verification_result.get('status', 'verification failed')}"
             )
         
         # Get temporary user data
@@ -150,6 +108,13 @@ async def verify_otp(
             raise HTTPException(
                 status_code=400,
                 detail="Registration session expired. Please register again."
+            )
+        
+        # Verify email matches
+        if temp_user["email"] != verification.email:
+            raise HTTPException(
+                status_code=400,
+                detail="Email mismatch. Please use the same email address used for registration."
             )
         
         user_dict = temp_user["user_dict"]
@@ -168,7 +133,9 @@ async def verify_otp(
         return {
             "message": f"{user_type} successfully created. Please login to continue.",
             "user_type": user_type.lower(),
-            "username": verification.user_id
+            "username": verification.user_id,
+            "email": verification.email,
+            "verification_status": verification_result["status"]
         }
         
     except HTTPException:
@@ -182,12 +149,11 @@ async def verify_otp(
 @otprouter.post("/resend")
 async def resend_otp(
     request: OTPRequest,
-    background_tasks: BackgroundTasks,
     db = Depends(get_db),
-    otp_manager: OTPManager = Depends(get_otp_manager)
+    verify_service: TwilioVerifyService = Depends(get_verify_service)
 ):
     """
-    Resend OTP code to user
+    Resend OTP code using Twilio Verify
     """
     try:
         # Check if user has pending registration
@@ -200,19 +166,25 @@ async def resend_otp(
                 detail="No pending registration found for this user."
             )
         
-        # Generate new OTP
-        otp_code = otp_manager.resend_otp(
-            user_id=request.user_id,
+        # Verify email matches
+        if temp_user["email"] != request.email:
+            raise HTTPException(
+                status_code=400,
+                detail="Email mismatch. Please use the same email address used for registration."
+            )
+        
+        # Send new OTP via Twilio Verify
+        verification_result = verify_service.send_verification_email(
             email=request.email,
             purpose=request.purpose
         )
         
-        # Send email in background
-        background_tasks.add_task(send_otp_email, request.email, otp_code, request.purpose)
-        
         return {
             "message": "New OTP sent to your email address.",
             "user_id": request.user_id,
+            "email": request.email,
+            "verification_sid": verification_result["verification_sid"],
+            "status": verification_result["status"],
             "expires_in_minutes": 10
         }
         
@@ -222,57 +194,4 @@ async def resend_otp(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to resend OTP: {str(e)}"
-        )
-
-@otprouter.get("/status/{user_id}")
-async def get_otp_status(
-    user_id: str,
-    purpose: str = "registration",
-    otp_manager: OTPManager = Depends(get_otp_manager)
-):
-    """
-    Get OTP status for user
-    """
-    try:
-        status = otp_manager.get_otp_status(user_id, purpose)
-        
-        if not status:
-            return {
-                "exists": False,
-                "message": "No active OTP found for this user."
-            }
-        
-        return {
-            "exists": True,
-            "expires_at": status["expires_at"],
-            "attempts_remaining": status["attempts_remaining"],
-            "created_at": status["created_at"],
-            "time_remaining_minutes": max(0, int((status["expires_at"] - datetime.utcnow()).total_seconds() / 60))
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get OTP status: {str(e)}"
-        )
-
-@otprouter.delete("/cleanup")
-async def cleanup_expired_otps(
-    db = Depends(get_db),
-    otp_manager: OTPManager = Depends(get_otp_manager)
-):
-    """
-    Admin endpoint to clean up expired OTPs
-    """
-    try:
-        deleted_count = otp_manager.cleanup_expired_otps()
-        return {
-            "message": f"Cleaned up {deleted_count} expired OTP codes.",
-            "deleted_count": deleted_count
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Cleanup failed: {str(e)}"
         )
