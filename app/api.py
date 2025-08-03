@@ -3,9 +3,10 @@ FastAPI Application Setup
 Clean, focused main application file with only app configuration and router registration
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from .login import get_db
 
 # Load environment variables
 load_dotenv()
@@ -64,3 +65,8 @@ async def root():
         "docs": "/docs",
         "redoc": "/redoc"
     }
+
+@app.get("/configure_db")
+async def configuredb(db = Depends(get_db)):
+    auth_states = db["auth_states"]
+    auth_states.create_index("expires_at", expireAfterSeconds = 1)
