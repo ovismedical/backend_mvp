@@ -565,7 +565,7 @@ async def google_auth_callback(
         auth_states_collection.delete_one({"_id": state_doc["_id"]})
         
         # Check if credentials file exists
-        credentials_file = 'client_secret_45929420082-2qvquovfdf0ct3u397b2ljfb6p2502l2.apps.googleusercontent.com.json'
+        credentials_file = os.getenv("CALENDAR_SECRET_FILE")
         if not os.path.exists(credentials_file):
             raise HTTPException(
                 status_code=500,
