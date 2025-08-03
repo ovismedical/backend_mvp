@@ -13,9 +13,9 @@ RUN pip install poetry
 # Copy only dependency files first to leverage Docker cache
 COPY pyproject.toml poetry.lock ./
 
-# Install dependencies (no dev packages in production)
+# Install dependencies
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi
 
 # Copy application code
 COPY . .
