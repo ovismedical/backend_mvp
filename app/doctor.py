@@ -20,3 +20,17 @@ def get_patients_by_doctor(doctor = Depends(get_user), db=Depends(get_db)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     patients = doctor["patients"]
     return {"patients": patients}
+
+@doctorrouter.get("/answers")
+def get_patient_answers(user_id: str, doctor = Depends(get_user), db=Depends(get_db)):
+    if not doctor["isDoctor"]:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    answers_collection = db["answers"]
+    answers = list(answers_collection.find({"user_id": user_id}).sort("timestamp", -1))
+    
+    # Convert ObjectId to string for JSON serialization
+    for answer in answers:
+        answer["_id"] = str(answer["_id"])
+    
+    return {"answers": answers}
