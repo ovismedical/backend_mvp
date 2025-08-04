@@ -14,3 +14,4 @@ view_database.py
 json_history_viewer.py
 
 *.json
+.DS_Store
