@@ -32,5 +32,5 @@ def get_patient_answers(user_id: str, doctor = Depends(get_user), db=Depends(get
     # Convert ObjectId to string for JSON serialization
     for answer in answers:
         answer["_id"] = str(answer["_id"])
-
+        
     return {"answers": answers}
