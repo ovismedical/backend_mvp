@@ -1,17 +1,15 @@
-from fastapi import Depends, FastAPI, HTTPException, status, APIRouter
+from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
-import re
-import json 
 import os
 from datetime import datetime, timezone, timedelta
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient
 from dotenv import load_dotenv
-from typing import Annotated
+from typing import Annotated, Optional, List
 
 
 # Load .env from current directory
@@ -45,6 +43,19 @@ class UserCreate(BaseModel):
     access_code: Annotated[str, Field(min_length = 4, max_length = 4)]
     password: Annotated[str, Field(min_length = 4)]
     email: EmailStr
+
+class UserInfo(BaseModel):
+    full_name:str
+    birthdate:str
+    gender: Optional[str]
+    height: int
+    weight: int
+    bloodtype: Optional[str]
+    fitness_level: int
+    exercises : List[str]
+    checkups : Optional[str]
+
+
 
 def verify_password(password, hashed_password):
     return pwd_context.verify(password, hashed_password)
@@ -104,7 +115,7 @@ def verify_code(code, user_dict):
 
 
 @loginrouter.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     user = db["users"].find_one({"username": form_data.username})
     if not user:
         user = db["doctors"].find_one({"username": form_data.username})
@@ -118,6 +129,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)
         return {"access_token": token, "token_type": "Bearer"}
     return ({"details":"Invalid credentials"}) 
     
+@loginrouter.post("/updateinfo")
+async def updateinfo(info: UserInfo, user = Depends(get_user), db = Depends(get_db)):
+    db["users"].update_one({"username":user["username"]}, {"$set":info.dict()})
+    return ({"details": "Succesfully updated user info"})
 
 @loginrouter.get("/userinfo")
 async def get_info(user = Depends(get_user)):

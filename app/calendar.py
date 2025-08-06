@@ -55,6 +55,15 @@ class CalendarEventResponse(BaseModel):
     html_link: str
     status: str
 
+class FreeBlock(BaseModel):
+    start_datetime: datetime
+    end_datetime: datetime
+    duration_minutes: int
+
+class TimeRange(BaseModel):
+    start_time: str  # Military time format HHMM (e.g., "0900" for 9:00 AM, "1730" for 5:30 PM)
+    end_time: str    # Military time format HHMM
+
 def get_encryption_key():
     """Get or create encryption key for credential storage"""
     key = os.getenv('CALENDAR_ENCRYPTION_KEY')    
@@ -169,7 +178,7 @@ def get_calendar_service(user_id: str, db):
             detail=f"Failed to initialize Google Calendar service: {str(e)}"
         )
 
-@calendarrouter.post("/events", response_model=CalendarEventResponse)
+@calendarrouter.post("/createevent", response_model=CalendarEventResponse)
 async def create_calendar_event(
     event: CalendarEvent,
     user = Depends(get_user),
@@ -179,6 +188,17 @@ async def create_calendar_event(
     try:
         user_id = user['username']
         service = get_calendar_service(user_id, db)
+        
+        # Get doctor's email if user has an assigned doctor
+        attendee_emails = list(event.attendees) if event.attendees else []
+        if user.get("doctor"):
+            doctor_username = user["doctor"]
+            doctors_collection = db["doctors"]
+            doctor = doctors_collection.find_one({"username": doctor_username})
+            if doctor and doctor.get("email"):
+                # Add doctor's email to attendees if not already present
+                if doctor["email"] not in attendee_emails:
+                    attendee_emails.append(doctor["email"])
         
         # Prepare event data for Google Calendar API
         event_data = {
@@ -193,7 +213,7 @@ async def create_calendar_event(
                 'dateTime': event.end_datetime.isoformat(),
                 'timeZone': 'UTC',
             },
-            'attendees': [{'email': email} for email in event.attendees] if event.attendees else [],
+            'attendees': [{'email': email} for email in attendee_emails],
             'reminders': {
                 'useDefault': False,
                 'overrides': [
@@ -711,4 +731,124 @@ async def quick_add_event(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create quick event: {str(e)}"
+        )
+
+@calendarrouter.post("/doctor/free-blocks", response_model=List[FreeBlock])
+async def get_doctor_free_blocks(
+    date: datetime,
+    time_ranges: List[TimeRange],
+    user = Depends(get_user),
+    db = Depends(get_db)
+):
+    """Get free time blocks from the user's assigned doctor's calendar"""
+    try:
+        # Check if user has an assigned doctor
+        if not user.get("doctor"):
+            raise HTTPException(
+                status_code=400,
+                detail="User does not have an assigned doctor"
+            )
+        
+        doctor_username = user["doctor"]
+        
+        # Verify doctor exists and get their calendar service
+        doctors_collection = db["doctors"]
+        doctor = doctors_collection.find_one({"username": doctor_username})
+        if not doctor:
+            raise HTTPException(
+                status_code=404,
+                detail="Assigned doctor not found"
+            )
+        
+        # Get doctor's calendar service
+        try:
+            service = get_calendar_service(doctor_username, db)
+        except HTTPException as e:
+            if e.status_code == 401:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Doctor has not authenticated their Google Calendar"
+                )
+            raise
+        
+        # Get doctor's events in the specified date range
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=date.isoformat() + 'Z',
+            timeMax=(date+timedelta(days = 1)).isoformat() + 'Z',
+            maxResults=1000,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Convert events to busy periods
+        busy_periods = []
+        for event in events:
+            if 'start' not in event or event.get('status') == 'cancelled':
+                continue
+                
+            start_time = event['start'].get('dateTime')
+            end_time = event['end'].get('dateTime')
+            
+            if not start_time or not end_time:
+                # Skip all-day events
+                continue
+            
+            busy_periods.append({
+                'start': datetime.fromisoformat(start_time.replace('Z', '+00:00')),
+                'end': datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+            })
+        
+        # Sort busy periods by start time
+        busy_periods.sort(key=lambda x: x['start'])
+        
+        # Generate free blocks for each provided time range
+        free_blocks = []
+        target_date = date.date()
+        
+        for time_range in time_ranges:
+            # Convert military time to datetime objects
+            try:
+                start_hour = int(time_range.start_time[:2])
+                start_minute = int(time_range.start_time[2:])
+                end_hour = int(time_range.end_time[:2])
+                end_minute = int(time_range.end_time[2:])
+                
+                range_start = datetime.combine(target_date, datetime.min.time().replace(hour=start_hour, minute=start_minute))
+                range_end = datetime.combine(target_date, datetime.min.time().replace(hour=end_hour, minute=end_minute))
+                
+            except (ValueError, IndexError) as e:
+                # Skip invalid time format
+                continue
+            
+            # Get busy periods that overlap with this time range
+            overlapping_busy_periods = []
+            for period in busy_periods:
+                # Check if busy period overlaps with our time range
+                if (period['start'] < range_end and period['end'] > range_start):
+                    overlapping_busy_periods.append(period)
+            
+            # Check if this time range is free
+            if not overlapping_busy_periods:
+                # Entire time range is free
+                range_duration = int((range_end - range_start).total_seconds() / 60)
+                free_blocks.append(FreeBlock(
+                    start_datetime=range_start,
+                    end_datetime=range_end,
+                    duration_minutes=range_duration
+                ))
+        
+        return free_blocks
+        
+    except HttpError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google Calendar API error: {error}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get doctor's free blocks: {str(e)}"
         )
