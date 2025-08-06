@@ -72,3 +72,4 @@ async def configuredb(db = Depends(get_db)):
     auth_states.create_index("expires_at", expireAfterSeconds = 1)
     temp_users = db["temp_users"]
     temp_users.create_index("created_at", expireAfterSeconds = 600)
+
