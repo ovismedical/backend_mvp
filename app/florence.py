@@ -30,7 +30,8 @@ from .florence_utils import (
     validate_session_access,
     is_ai_available,
     create_assessment_record,
-    create_session_response_data
+    create_session_response_data,
+    get_localized_message
 )
 
 florencerouter = APIRouter(prefix="/florence", tags=["florence"])
@@ -194,13 +195,14 @@ async def get_session_status(
 ):
     """Get current session status and conversation history"""
     if session_id not in active_sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail=get_localized_message("session_not_found"))
     
     session = active_sessions[session_id]
+    session_language = session.get("language", "en")
     
     # Verify user owns this session using shared utility
     if not validate_session_access(session, user["username"]):
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail=get_localized_message("access_denied", session_language))
     
     # Return standardized session response
     return create_session_response_data(session)
@@ -212,16 +214,17 @@ async def send_message_to_florence_endpoint(
 ):
     """Send a message to Florence in an active session"""
     if request.session_id not in active_sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail=get_localized_message("session_not_found"))
     
     session = active_sessions[request.session_id]
+    session_language = session.get("language", "en")
     
     # Verify user owns this session using shared utility
     if not validate_session_access(session, user["username"]):
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail=get_localized_message("access_denied", session_language))
     
     if session["status"] != "active":
-        raise HTTPException(status_code=400, detail="Session is not active")
+        raise HTTPException(status_code=400, detail=get_localized_message("session_not_active", session_language))
     
     try:
         # Add user message to conversation history using standardized format
@@ -273,13 +276,14 @@ async def finish_florence_session(
 ):
     """Finish a Florence session and save the assessment"""
     if session_id not in active_sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail=get_localized_message("session_not_found"))
     
     session = active_sessions[session_id]
+    session_language = session.get("language", "en")
     
     # Verify user owns this session using shared utility
     if not validate_session_access(session, user["username"]):
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail=get_localized_message("access_denied", session_language))
     
     try:
         # Check if session has expired
@@ -289,7 +293,7 @@ async def finish_florence_session(
         
         if time_diff > SESSION_EXPIRY:
             del active_sessions[session_id]
-            raise HTTPException(status_code=410, detail="Session has expired")
+            raise HTTPException(status_code=410, detail=get_localized_message("session_expired", session_language))
         
         # Generate structured assessment and triage assessment in parallel
         print(f"🔬 Starting assessment and triage generation for session {session_id}")
@@ -389,14 +393,14 @@ async def finish_florence_session(
             print(f"✅ Saved assessment for session {session_id}")
         except Exception as e:
             print(f"❌ Failed to save assessment: {e}")
-            raise HTTPException(status_code=500, detail="Failed to save assessment")
+            raise HTTPException(status_code=500, detail=get_localized_message("failed_to_save_assessment", session_language))
         
         # Mark session as completed
         session["status"] = "completed"
         session["completed_at"] = create_timestamp()
         
         return {
-            "message": "Session completed successfully",
+            "message": get_localized_message("session_completed", session_language),
             "assessment": assessment,
             "triage": triage,
             "alert_level": alert_level,

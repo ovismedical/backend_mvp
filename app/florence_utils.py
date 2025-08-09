@@ -450,13 +450,48 @@ def create_conversation_message(role: str, content: str, include_timestamp: bool
 
 def generate_fallback_response(patient_name: str, context: str = "general") -> str:
     """Generate fallback responses when AI is unavailable"""
+    error_message = "AI connection difficulty. Please contact the developers. 我們無法連接 AI。請聯繫開發人員。"
     fallback_responses = {
-        "welcome": f"Hello {patient_name}! I'm Florence, your AI nurse. I'm here to chat with you about how you're feeling today. How are you doing?",
-        "processing_error": "I'm sorry, I had trouble processing that. Could you tell me more about how you're feeling today?",
-        "general_followup": f"Thank you for sharing that, {patient_name}. Can you tell me more about how you've been feeling today?",
-        "system_error": "I'm sorry, but I'm having trouble right now. Please try again later."
+        "welcome": error_message,
+        "processing_error": error_message,
+        "general_followup": error_message,
+        "system_error": error_message
     }
-    return fallback_responses.get(context, fallback_responses["general_followup"])
+    return fallback_responses.get(context, error_message)
+
+def get_localized_message(message_key: str, language: str = "en") -> str:
+    """Get localized message based on language setting"""
+    messages = {
+        "session_not_found": {
+            "en": "Session not found",
+            "zh-HK": "找不到會話"
+        },
+        "access_denied": {
+            "en": "Access denied",
+            "zh-HK": "拒絕訪問"
+        },
+        "session_expired": {
+            "en": "Session has expired",
+            "zh-HK": "會話已過期"
+        },
+        "failed_to_save_assessment": {
+            "en": "Failed to save assessment",
+            "zh-HK": "保存評估失敗"
+        },
+        "session_completed": {
+            "en": "Session completed successfully",
+            "zh-HK": "會話已成功完成"
+        },
+        "session_not_active": {
+            "en": "Session is not active",
+            "zh-HK": "會話未處於活動狀態"
+        }
+    }
+    
+    lang_key = "zh-HK" if language == "zh-HK" else "en"
+    if message_key in messages:
+        return messages[message_key].get(lang_key, messages[message_key]["en"])
+    return message_key  # Return the key if not found
 
 # Note: Text-based symptom detection removed as it was unreliable.
 # The AI now uses structured assessment for accurate symptom tracking.

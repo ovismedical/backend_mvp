@@ -6,6 +6,12 @@ Clean, focused main application file with only app configuration and router regi
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from datetime import datetime, timezone
+import os
+import asyncio
+import time
+from pymongo import MongoClient
+from .florence import florence_ai, initialize_florence, periodic_cleanup
 
 # Load environment variables
 load_dotenv()
@@ -44,15 +50,53 @@ app.include_router(calendarrouter)
 app.include_router(otprouter)
 app.include_router(analyticsrouter)
 
+# In app/florence.py - Replace the startup event
+@florencerouter.on_event("startup")
+async def startup_florence():
+    """Initialize background tasks without blocking startup"""
+    # Start cleanup task immediately
+    asyncio.create_task(periodic_cleanup())
+    
+    # Initialize Florence AI in background
+    asyncio.create_task(background_florence_init())
+
+async def background_florence_init():
+    """Initialize Florence AI in background"""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        success = await initialize_florence(api_key)
+        if success:
+            print("✅ Florence AI initialized successfully")
+        else:
+            print("❌ Florence AI initialization failed")
+    else:
+        print("⚠️ No OpenAI API key found - Florence will use fallback responses")
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Simple health check endpoint"""
-    return {
+    """Enhanced health check with dependency status"""
+    # Basic health - always return quickly
+    health_status = {
         "status": "healthy",
         "service": "OVIS Medical Backend",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
+    
+    # Add optional dependency checks (non-blocking)
+    try:
+        # Quick MongoDB ping (with timeout)
+        db = get_db()
+        db.admin.command('ping')
+        health_status["database"] = "connected"
+    except:
+        health_status["database"] = "disconnected"
+    
+    # Florence AI status (check if initialized, don't initialize)
+    health_status["florence_ai"] = "ready" if florence_ai.client else "initializing"
+    
+    return health_status
 
 # Root endpoint
 @app.get("/")
@@ -64,3 +108,20 @@ async def root():
         "docs": "/docs",
         "redoc": "/redoc"
     }
+
+@app.get("/render-health")
+async def render_health_check():
+    """Ultra-lightweight health check for Render monitoring"""
+    return {"status": "ok"}
+
+def get_db():
+    client = MongoClient(
+        os.getenv("MONGODB_URI"),
+        maxPoolSize=10,
+        minPoolSize=2,
+        maxIdleTimeMS=30000,
+        waitQueueTimeoutMS=5000,
+        serverSelectionTimeoutMS=5000
+    )
+    db = client["ovis-demo"]
+    return db
