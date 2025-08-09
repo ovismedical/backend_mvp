@@ -3,7 +3,7 @@ FastAPI Application Setup
 Clean, focused main application file with only app configuration and router registration
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from datetime import datetime, timezone
@@ -12,6 +12,7 @@ import asyncio
 import time
 from pymongo import MongoClient
 from .florence import florence_ai, initialize_florence, periodic_cleanup
+from .login import get_db
 
 # Load environment variables
 load_dotenv()
@@ -114,14 +115,11 @@ async def render_health_check():
     """Ultra-lightweight health check for Render monitoring"""
     return {"status": "ok"}
 
-def get_db():
-    client = MongoClient(
-        os.getenv("MONGODB_URI"),
-        maxPoolSize=10,
-        minPoolSize=2,
-        maxIdleTimeMS=30000,
-        waitQueueTimeoutMS=5000,
-        serverSelectionTimeoutMS=5000
-    )
-    db = client["ovis-demo"]
-    return db
+@app.get("/configure_db")
+async def configure_db(db = Depends(get_db)):
+    """Configure database indexes for TTL collections"""
+    auth_states = db["auth_states"]
+    auth_states.create_index("expires_at", expireAfterSeconds=1)
+    temp_users = db["temp_users"]
+    temp_users.create_index("created_at", expireAfterSeconds=600)
+    return {"message": "Database indexes configured successfully"}
