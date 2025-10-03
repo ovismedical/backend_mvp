@@ -296,8 +296,13 @@ def generate_smart_insights(triage_data, structured_data):
     """Generate smart insights based on triage and structured assessment data"""
     insights = []
     
+    # Debug logging
+    print(f"🔍 Debug - triage_data type: {type(triage_data)}")
+    print(f"🔍 Debug - structured_data type: {type(structured_data)}")
+    print(f"🔍 Debug - structured_data keys: {structured_data.keys() if isinstance(structured_data, dict) else 'Not a dict'}")
+    
     # Analyze alert level
-    alert_level = triage_data.get("alert_level")
+    alert_level = triage_data.get("alert_level") if isinstance(triage_data, dict) else None
     if alert_level == "GREEN":
         insights.append({
             "icon": "check_circle",
@@ -320,14 +325,48 @@ def generate_smart_insights(triage_data, structured_data):
             "insightType": "error"
         })
     
-    # Analyze symptoms
-    symptoms = structured_data.get("symptoms", [])
+    # Analyze symptoms - handle both dict and list formats
+    symptoms = []
+    if isinstance(structured_data, dict):
+        symptoms_raw = structured_data.get("symptoms", [])
+        print(f"🔍 Debug - symptoms_raw type: {type(symptoms_raw)}")
+        print(f"🔍 Debug - symptoms_raw content: {symptoms_raw}")
+        
+        if isinstance(symptoms_raw, list):
+            symptoms = symptoms_raw
+        elif isinstance(symptoms_raw, dict):
+            # Convert dict format to list format
+            symptoms = []
+            for symptom_name, symptom_data in symptoms_raw.items():
+                if isinstance(symptom_data, dict):
+                    symptoms.append({
+                        "symptom": symptom_name,
+                        "severity": symptom_data.get("severity", "unknown"),
+                        "frequency": symptom_data.get("frequency", "unknown"),
+                        "duration": symptom_data.get("duration", "unknown"),
+                        "impact": symptom_data.get("impact", "unknown")
+                    })
+                else:
+                    # If symptom_data is not a dict, treat it as a simple symptom
+                    symptoms.append({
+                        "symptom": symptom_name,
+                        "severity": "unknown"
+                    })
+    
+    print(f"🔍 Debug - processed symptoms: {symptoms}")
+    
     if symptoms:
         # Check for mood-sleep correlation
-        mood_symptoms = [s for s in symptoms if any(keyword in s.get("symptom", "").lower() 
-                          for keyword in ["mood", "depression", "anxiety"])]
-        sleep_symptoms = [s for s in symptoms if any(keyword in s.get("symptom", "").lower() 
-                           for keyword in ["sleep", "insomnia", "restless"])]
+        mood_symptoms = []
+        sleep_symptoms = []
+        
+        for s in symptoms:
+            if isinstance(s, dict):
+                symptom_name = s.get("symptom", "").lower()
+                if any(keyword in symptom_name for keyword in ["mood", "depression", "anxiety"]):
+                    mood_symptoms.append(s)
+                if any(keyword in symptom_name for keyword in ["sleep", "insomnia", "restless"]):
+                    sleep_symptoms.append(s)
         
         if mood_symptoms and sleep_symptoms:
             insights.append({
@@ -338,7 +377,13 @@ def generate_smart_insights(triage_data, structured_data):
             })
         
         # Check for high severity symptoms
-        high_severity = [s for s in symptoms if s.get("severity", "").lower() in ["severe", "high"]]
+        high_severity = []
+        for s in symptoms:
+            if isinstance(s, dict):
+                severity = s.get("severity", "").lower()
+                if severity in ["severe", "high"]:
+                    high_severity.append(s)
+        
         if high_severity:
             insights.append({
                 "icon": "warning",
@@ -348,7 +393,13 @@ def generate_smart_insights(triage_data, structured_data):
             })
         
         # Check for improvement trends
-        mild_symptoms = [s for s in symptoms if s.get("severity", "").lower() in ["mild", "low"]]
+        mild_symptoms = []
+        for s in symptoms:
+            if isinstance(s, dict):
+                severity = s.get("severity", "").lower()
+                if severity in ["mild", "low"]:
+                    mild_symptoms.append(s)
+        
         if len(mild_symptoms) >= len(symptoms) * 0.7:
             insights.append({
                 "icon": "trending_up",
@@ -358,9 +409,18 @@ def generate_smart_insights(triage_data, structured_data):
             })
     
     # Analyze diagnoses
-    diagnoses = triage_data.get("diagnosis_predictions", [])
+    diagnoses = []
+    if isinstance(triage_data, dict):
+        diagnoses = triage_data.get("diagnosis_predictions", [])
+    
     if diagnoses:
-        high_urgency = [d for d in diagnoses if d.get("urgency", 0) >= 4]
+        high_urgency = []
+        for d in diagnoses:
+            if isinstance(d, dict):
+                urgency = d.get("urgency", 0)
+                if urgency >= 4:
+                    high_urgency.append(d)
+        
         if high_urgency:
             insights.append({
                 "icon": "medical_services",
