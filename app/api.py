@@ -41,6 +41,7 @@ from .florence import florencerouter
 from .calendar import calendarrouter
 from .otp_routes import otprouter
 from .analytics import analyticsrouter
+from .triage_api import trierouter
 
 # Register all routers
 app.include_router(loginrouter)
@@ -50,6 +51,7 @@ app.include_router(florencerouter)
 app.include_router(calendarrouter)
 app.include_router(otprouter)
 app.include_router(analyticsrouter)
+app.include_router(trierouter)
 
 # In app/florence.py - Replace the startup event
 @florencerouter.on_event("startup")
