@@ -1,11 +1,18 @@
 from .login import get_db, get_user
+from .achievements import check_and_unlock_achievements
 from fastapi import APIRouter
 from fastapi import Depends, FastAPI, HTTPException, status
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import json
+import os
 
 questionsrouter = APIRouter(tags = ["questions"])
+
+QUESTIONS_FILE = os.getenv(
+    "QUESTIONS_FILE",
+    os.path.join(os.path.dirname(__file__), "..", "api_questions.json")
+)
 
 class SubmissionRequest(BaseModel):
     user_id: str
@@ -18,7 +25,7 @@ class NextQuestionRequest(BaseModel):
 async def get_questions():
     """Load questions from api_questions.json file"""
     try:
-        with open("/Users/evanning/ovis/api_questions.json", "r") as f:
+        with open(QUESTIONS_FILE, "r") as f:
             questions_data = json.load(f)
         return questions_data
     except FileNotFoundError:
@@ -31,7 +38,7 @@ async def get_next_question(request: NextQuestionRequest):
     """Get the next question based on current answers and prerequisites"""
     try:
         # Load questions from api_questions.json file
-        with open("/Users/evanning/ovis/api_questions.json", "r") as f:
+        with open(QUESTIONS_FILE, "r") as f:
             questions_data = json.load(f)
         
         all_questions = questions_data["questions"]
@@ -128,12 +135,14 @@ async def submit_answers(submission: SubmissionRequest, db = Depends(get_db)):
                 new_streak = current_streak + 1
             else:
                 new_streak = 1  # Reset streak if more than a day gap
-            
+
+            longest_streak = max(new_streak, user.get("longest_streak", 0))
             users.update_one(
                 {"username": submission.user_id},
-                {"$set": {"streak": new_streak, "last_completion": today}}
+                {"$set": {"streak": new_streak, "longest_streak": longest_streak, "last_completion": today}}
             )
-            return {"message": "Answers submitted successfully", "streak": new_streak}
+            newly_unlocked = check_and_unlock_achievements(db, submission.user_id, longest_streak)
+            return {"message": "Answers submitted successfully", "streak": new_streak, "newly_unlocked": newly_unlocked}
         
         return {"message": "Answers submitted successfully"}
         
@@ -146,25 +155,23 @@ def get_streak(username, db=Depends(get_db)):
     user = users.find_one({"username": username}, {"_id": 0, "password": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    longest_streak = user.get("longest_streak", 0)
     today = datetime.now(timezone.utc).date()
     last_completion = user.get("last_completion")
-    
+
     if not last_completion:
-        # If no last_completion date, streak is 0
-        return 0
-    
+        return {"streak": 0, "longest_streak": longest_streak}
+
     try:
         last_check_in = datetime.strptime(last_completion, "%m/%d/%Y").date()
     except (ValueError, TypeError):
-        # If invalid date format, reset streak
         users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return 0
+        return {"streak": 0, "longest_streak": longest_streak}
 
-    if last_check_in == today:
-        return user.get("streak", 0)
-    elif last_check_in == today - timedelta(days=1):
-        return user.get("streak", 0)
+    if last_check_in == today or last_check_in == today - timedelta(days=1):
+        current = user.get("streak", 0)
+        return {"streak": current, "longest_streak": longest_streak}
     else:
         users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return 0
+        return {"streak": 0, "longest_streak": longest_streak}

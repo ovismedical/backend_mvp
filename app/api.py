@@ -7,12 +7,8 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from datetime import datetime, timezone
-import os
-import asyncio
-import time
-from pymongo import MongoClient
-from .florence import florence_ai, initialize_florence, periodic_cleanup
-from .login import get_db
+from .florence import florence_ai
+from .login import get_db, get_client
 
 # Load environment variables
 load_dotenv()
@@ -42,6 +38,9 @@ from .calendar import calendarrouter
 from .otp_routes import otprouter
 from .analytics import analyticsrouter
 from .triage_api import trierouter
+from .symptom_questionnaire import symptom_router
+from .admin import adminrouter
+from .achievements import achievementsrouter
 
 # Register all routers
 app.include_router(loginrouter)
@@ -52,28 +51,9 @@ app.include_router(calendarrouter)
 app.include_router(otprouter)
 app.include_router(analyticsrouter)
 app.include_router(trierouter)
-
-# In app/florence.py - Replace the startup event
-@florencerouter.on_event("startup")
-async def startup_florence():
-    """Initialize background tasks without blocking startup"""
-    # Start cleanup task immediately
-    asyncio.create_task(periodic_cleanup())
-    
-    # Initialize Florence AI in background
-    asyncio.create_task(background_florence_init())
-
-async def background_florence_init():
-    """Initialize Florence AI in background"""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        success = await initialize_florence(api_key)
-        if success:
-            print("✅ Florence AI initialized successfully")
-        else:
-            print("❌ Florence AI initialization failed")
-    else:
-        print("⚠️ No OpenAI API key found - Florence will use fallback responses")
+app.include_router(symptom_router)
+app.include_router(adminrouter)
+app.include_router(achievementsrouter)
 
 # Health check endpoint
 @app.get("/health")
@@ -89,9 +69,8 @@ async def health_check():
     
     # Add optional dependency checks (non-blocking)
     try:
-        # Quick MongoDB ping (with timeout)
-        db = get_db()
-        db.admin.command('ping')
+        client = get_client()
+        client.admin.command('ping')
         health_status["database"] = "connected"
     except:
         health_status["database"] = "disconnected"

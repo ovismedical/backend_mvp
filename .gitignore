@@ -1,17 +1,36 @@
-# Backend specific environment files
+# Virtual environment
+venv/
+.venv/
+bin/
+lib/
+lib64
+include/
+local/
+pyvenv.cfg
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment secrets
 .env
 app/.env
 
-# Python cache (keep for backend-specific ignoring)
-__pycache__/
-*.pyc
-
-# Backend specific dependencies and data
-poetry.lock
-create_dummy_*.py
-*.db
-view_database.py
-json_history_viewer.py
-
-*.json
+# OS junk
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+user_florence_logs.txt
+
+# IDE
+.idea/
+.vscode/
+
+# Dependencies lock (optional — uncomment if you don't want to track it)
+# poetry.lock
+
+# Database files
+*.db

@@ -21,7 +21,7 @@ from .florence_utils import (
 class FlorenceAI:
     def __init__(self):
         self.client = None
-        self.model = "gpt-4"
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
         self.temperature = 0.8
         self.conversation_state = "starting"  # starting, assessing, completing
         self.system_prompt = None  # Will be loaded when needed
@@ -40,26 +40,20 @@ class FlorenceAI:
         
     def initialize(self, api_key: str = None):
         """Initialize OpenAI client"""
+        if self.client:
+            return True
         try:
-            if api_key:
-                print(f"🔑 Initializing with provided API key: {api_key[:10]}...")
-                self.client = OpenAI(
-                    api_key=api_key,
-                    timeout=60.0,  # Increase timeout for VPN
-                    max_retries=3
-                )
-            else:
-                # Try to get from environment
+            if not api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
-                    print("❌ No OpenAI API key found")
-                    raise ValueError("OpenAI API key not provided")
-                print(f"🔑 Using hardcoded API key: {api_key[:10]}...")
-                self.client = OpenAI(
-                    api_key=api_key,
-                    timeout=60.0,  # Increase timeout for VPN
-                    max_retries=3
-                )
+            if not api_key:
+                print("❌ No OpenAI API key found")
+                raise ValueError("OpenAI API key not provided")
+            print(f"🔑 Initializing with API key: {api_key[:10]}...")
+            self.client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+                max_retries=3
+            )
             print("✅ OpenAI client initialized successfully")
             return True
         except Exception as e:

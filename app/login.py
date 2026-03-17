@@ -18,11 +18,18 @@ load_dotenv()
 loginrouter = APIRouter(tags = ["login"])
 
 MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB = os.getenv("MONGODB_DB", "ovis-demo")
+
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = MongoClient(MONGODB_URI)
+    return _client
 
 def get_db():
-    client = MongoClient(MONGODB_URI)
-    db = client["ovis-demo"]
-    return db
+    return get_client()[MONGODB_DB]
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"

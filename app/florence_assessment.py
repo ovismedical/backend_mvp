@@ -24,7 +24,7 @@ class FlorenceAssessment:
     
     def __init__(self):
         self.client = None
-        self.model = "gpt-4"
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
         self.temperature = 0.8
         
     def initialize(self, api_key: str = None):

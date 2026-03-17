@@ -23,7 +23,7 @@ class FlorenceTriage:
     
     def __init__(self):
         self.client = None
-        self.model = "gpt-4"
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
         self.temperature = 0.3  # Lower temperature for more consistent clinical decisions
         
     def initialize(self, api_key: str = None):
