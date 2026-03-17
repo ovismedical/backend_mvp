@@ -49,7 +49,7 @@ async def register_with_otp(
         temp_user_doc = {
             "user_id": user.username,
             "user_dict": user_dict,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "email": user.email
         }
         

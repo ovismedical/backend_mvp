@@ -1,7 +1,7 @@
 from .login import get_db, get_user
 from .achievements import check_and_unlock_achievements
 from fastapi import APIRouter
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import json

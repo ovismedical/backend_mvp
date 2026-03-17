@@ -15,6 +15,7 @@ __pycache__/
 
 # Environment secrets
 .env
+.env.example
 app/.env
 
 # OS junk

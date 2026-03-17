@@ -1,9 +1,18 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from .login import get_db, get_user
 
 adminrouter = APIRouter(prefix="/admin", tags=["admin"])
 
-RELATED_COLLECTIONS = ["answers", "florence_assessments", "calendar_credentials"]
+RELATED_COLLECTIONS = [
+    "answers",
+    "florence_assessments",
+    "calendar_credentials",
+    "symptom_questionnaires",
+    "questionnaire_drafts",
+    "user_achievements",
+]
 
 
 def require_doctor(user=Depends(get_user)):
@@ -16,10 +25,11 @@ def require_doctor(user=Depends(get_user)):
 def list_users(search: str = None, user=Depends(require_doctor), db=Depends(get_db)):
     query = {}
     if search:
+        escaped = re.escape(search)
         query = {"$or": [
-            {"username": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
-            {"full_name": {"$regex": search, "$options": "i"}},
+            {"username": {"$regex": escaped, "$options": "i"}},
+            {"email": {"$regex": escaped, "$options": "i"}},
+            {"full_name": {"$regex": escaped, "$options": "i"}},
         ]}
 
     users = list(db["users"].find(query, {"password": 0}))

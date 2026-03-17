@@ -127,14 +127,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
     if not user:
         user = db["doctors"].find_one({"username": form_data.username})
         if not user:
-            return ({"details":"Invalid credentials"}) 
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         if verify_password(form_data.password, user["password"]):
             token = create_access_token({"sub": user["username"]}, admin = True)
             return {"access_token": token, "token_type": "Bearer"}
     if verify_password(form_data.password, user["password"]):
         token = create_access_token({"sub": user["username"]})
         return {"access_token": token, "token_type": "Bearer"}
-    return ({"details":"Invalid credentials"}) 
+    raise HTTPException(status_code=401, detail="Invalid credentials")
     
 @loginrouter.post("/updateinfo")
 async def updateinfo(info: UserInfo, user = Depends(get_user), db = Depends(get_db)):

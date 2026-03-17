@@ -9,6 +9,20 @@ from .login import get_user, get_db
 
 trierouter = APIRouter(prefix="/triage", tags=["triage"])
 
+
+def _verify_patient_access(user: dict, patient_id: str):
+    """Check that user can access this patient's data.
+
+    Patients can access their own data.
+    Doctors can access data for patients in their patients list.
+    """
+    if user["username"] == patient_id:
+        return
+    if user.get("isDoctor") and patient_id in user.get("patients", []):
+        return
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
 @trierouter.get("/history/{patient_id}")
 async def get_triage_history(
     patient_id: str,
@@ -20,10 +34,8 @@ async def get_triage_history(
     Get triage history for a patient
     """
     try:
-        # Verify user has access to this patient's data
-        if user['username'] != patient_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+        _verify_patient_access(user, patient_id)
+
         # Get triage assessments from florence_assessments collection
         collection = db["florence_assessments"]
         
@@ -77,12 +89,8 @@ async def get_latest_triage(
     """
     try:
         # Allow demo_patient access without authentication for testing
-        if patient_id == "demo_patient":
-            pass  # Skip authentication check for demo
-        else:
-            # Verify user has access to this patient's data
-            if user['username'] != patient_id:
-                raise HTTPException(status_code=403, detail="Access denied")
+        if patient_id != "demo_patient":
+            _verify_patient_access(user, patient_id)
         
         # Get latest triage assessment
         collection = db["florence_assessments"]
@@ -134,9 +142,7 @@ async def get_triage_by_session(
         if not assessment:
             raise HTTPException(status_code=404, detail="Session not found")
         
-        # Verify user has access to this session
-        if user['username'] != assessment.get("user_id"):
-            raise HTTPException(status_code=403, detail="Access denied")
+        _verify_patient_access(user, assessment.get("user_id", ""))
         
         triage_data = assessment.get("triage_assessment")
         if not triage_data:
@@ -165,12 +171,10 @@ async def get_triage_stats(
     Get triage statistics for a patient
     """
     try:
-        # Verify user has access to this patient's data
-        if user['username'] != patient_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+        _verify_patient_access(user, patient_id)
+
         collection = db["florence_assessments"]
-        
+
         # Get all assessments with triage data
         assessments = list(collection.find(
             {
@@ -253,10 +257,8 @@ async def get_smart_insights(
     Get smart insights based on triage and structured assessment data
     """
     try:
-        # Verify user has access to this patient's data
-        if user['username'] != patient_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+        _verify_patient_access(user, patient_id)
+
         # Get latest assessment data
         collection = db["florence_assessments"]
         assessment = collection.find_one(

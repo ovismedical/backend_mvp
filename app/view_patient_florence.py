@@ -25,7 +25,7 @@ def format_timestamp(timestamp_str):
         else:
             dt = datetime.fromisoformat(timestamp_str)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         return timestamp_str
 
 def print_conversation(conversation_history):

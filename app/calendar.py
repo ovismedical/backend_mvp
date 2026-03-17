@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import os
 import json
@@ -101,7 +101,7 @@ def save_credentials_to_db(user_id: str, creds: Credentials, db):
                 "$set": {
                     "user_id": user_id,
                     "encrypted_credentials": encrypted_creds,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }
             },
             upsert=True
@@ -274,7 +274,7 @@ async def list_calendar_events(
         
         # Set default time range if not provided
         if not time_min:
-            time_min = datetime.utcnow()
+            time_min = datetime.now(timezone.utc)
         if not time_max:
             time_max = time_min + timedelta(days=30)  # Next 30 days
             
@@ -526,8 +526,8 @@ async def start_google_auth(
         auth_states_collection.insert_one({
             "user_id": user_id,
             "state": state,
-            "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(minutes=10)
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
         })
         
         # Create OAuth flow with web-based redirect
@@ -570,7 +570,7 @@ async def google_auth_callback(
         auth_states_collection = db["auth_states"]
         state_doc = auth_states_collection.find_one({
             "state": state,
-            "expires_at": {"$gt": datetime.utcnow()}
+            "expires_at": {"$gt": datetime.now(timezone.utc)}
         })
         
         if not state_doc:

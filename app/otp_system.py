@@ -34,7 +34,7 @@ class OTPManager:
         # Check rate limiting - max 3 OTPs per user per hour
         recent_otps = self.otp_collection.count_documents({
             "user_id": user_id,
-            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=1)}
+            "created_at": {"$gte": datetime.now(timezone.utc) - timedelta(hours=1)}
         })
         
         if recent_otps >= 3:
@@ -51,7 +51,7 @@ class OTPManager:
         
         # Generate new OTP
         otp_code = self.generate_otp()
-        expiry_time = datetime.utcnow() + timedelta(minutes=expiry_minutes)
+        expiry_time = datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes)
         
         # Store OTP (plaintext for verification, hashed for logs)
         otp_doc = {
@@ -60,7 +60,7 @@ class OTPManager:
             "otp_code": otp_code,  # Store plaintext for easy verification
             "otp_hash": hashlib.sha256(otp_code.encode()).hexdigest(),  # For audit logs
             "purpose": purpose,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "expires_at": expiry_time,
             "verified": False,
             "attempts": 0,
@@ -111,7 +111,7 @@ class OTPManager:
             )
         
         # Check if OTP has expired
-        if datetime.utcnow() > otp_doc["expires_at"]:
+        if datetime.now(timezone.utc) > otp_doc["expires_at"]:
             self.otp_collection.delete_one({"_id": otp_doc["_id"]})
             raise HTTPException(
                 status_code=400,
@@ -137,7 +137,7 @@ class OTPManager:
             # Mark as verified and clean up
             self.otp_collection.update_one(
                 {"_id": otp_doc["_id"]},
-                {"$set": {"verified": True, "verified_at": datetime.utcnow()}}
+                {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc)}}
             )
             return True
         else:
@@ -152,7 +152,7 @@ class OTPManager:
         recent_otp = self.otp_collection.find_one({
             "user_id": user_id,
             "purpose": purpose,
-            "created_at": {"$gte": datetime.utcnow() - timedelta(seconds=30)}
+            "created_at": {"$gte": datetime.now(timezone.utc) - timedelta(seconds=30)}
         })
         
         if recent_otp:
@@ -166,7 +166,7 @@ class OTPManager:
     def cleanup_expired_otps(self):
         """Clean up expired OTPs (call this periodically)"""
         result = self.otp_collection.delete_many({
-            "expires_at": {"$lt": datetime.utcnow()}
+            "expires_at": {"$lt": datetime.now(timezone.utc)}
         })
         return result.deleted_count
     

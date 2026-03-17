@@ -72,7 +72,7 @@ async def health_check():
         client = get_client()
         client.admin.command('ping')
         health_status["database"] = "connected"
-    except:
+    except Exception:
         health_status["database"] = "disconnected"
     
     # Florence AI status (check if initialized, don't initialize)
