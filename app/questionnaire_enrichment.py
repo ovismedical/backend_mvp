@@ -36,6 +36,8 @@ def evaluate_conditional(question_def: dict, raw_answers: Dict[str, Any]) -> boo
         return dep_value == target
     if op == "in_list":
         return dep_value in target
+    if op == "contains":
+        return isinstance(dep_value, list) and target in dep_value
 
     return True
 
@@ -63,7 +65,7 @@ def _resolve_display_value(question_def: dict, raw_value: Any) -> Any:
             return [options.get(v, str(v)) for v in raw_value]
         return options.get(raw_value, str(raw_value))
 
-    if q_type == "body-diagram":
+    if q_type in ("body-diagram", "muscle-diagram"):
         regions = question_def.get("regions", {})
         if isinstance(raw_value, list):
             return [regions.get(v, str(v)) for v in raw_value]
@@ -178,8 +180,8 @@ def _check_alert_flags(section_def: dict, raw_answers: Dict[str, Any]) -> List[s
                 labels = [q["options"].get(v, v) for v in matched]
                 flags.append(f"{section_title}: alarming color reported ({', '.join(labels)})")
 
-        # Body diagram 3+ regions
-        if q["type"] == "body-diagram" and isinstance(raw_value, list) and len(raw_value) >= 3:
+        # Body/muscle diagram 3+ regions
+        if q["type"] in ("body-diagram", "muscle-diagram") and isinstance(raw_value, list) and len(raw_value) >= 3:
             flags.append(f"{section_title}: {len(raw_value)} body regions affected")
 
         # Slider alert rules (e.g., sleep <= 3 hours)
@@ -245,8 +247,8 @@ def enrich_submission(
             if was_shown and raw_value is not None and q["type"] in ("rating", "slider"):
                 response["severity_normalized"] = _compute_severity_normalized(q, raw_value)
 
-            # Add region_count for body-diagram
-            if q["type"] == "body-diagram" and was_shown and isinstance(raw_value, list):
+            # Add region_count for body/muscle diagram
+            if q["type"] in ("body-diagram", "muscle-diagram") and was_shown and isinstance(raw_value, list):
                 response["region_count"] = len(raw_value)
 
             # Mark skip reason
@@ -280,7 +282,7 @@ def enrich_submission(
             details = []
             for r in responses:
                 if r["was_shown"] and r["display_value"] is not None:
-                    if isinstance(r["display_value"], list) and r["type"] in ("multi-select", "body-diagram"):
+                    if isinstance(r["display_value"], list) and r["type"] in ("multi-select", "body-diagram", "muscle-diagram"):
                         details.extend(r["display_value"])
 
             concern = {
