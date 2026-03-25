@@ -65,7 +65,7 @@ def _resolve_display_value(question_def: dict, raw_value: Any) -> Any:
             return [options.get(v, str(v)) for v in raw_value]
         return options.get(raw_value, str(raw_value))
 
-    if q_type in ("body-diagram", "muscle-diagram"):
+    if q_type in ("body-diagram", "muscle-diagram", "joint-diagram"):
         regions = question_def.get("regions", {})
         if isinstance(raw_value, list):
             return [regions.get(v, str(v)) for v in raw_value]
@@ -181,7 +181,7 @@ def _check_alert_flags(section_def: dict, raw_answers: Dict[str, Any]) -> List[s
                 flags.append(f"{section_title}: alarming color reported ({', '.join(labels)})")
 
         # Body/muscle diagram 3+ regions
-        if q["type"] in ("body-diagram", "muscle-diagram") and isinstance(raw_value, list) and len(raw_value) >= 3:
+        if q["type"] in ("body-diagram", "muscle-diagram", "joint-diagram") and isinstance(raw_value, list) and len(raw_value) >= 3:
             flags.append(f"{section_title}: {len(raw_value)} body regions affected")
 
         # Slider alert rules (e.g., sleep <= 3 hours)
@@ -248,7 +248,7 @@ def enrich_submission(
                 response["severity_normalized"] = _compute_severity_normalized(q, raw_value)
 
             # Add region_count for body/muscle diagram
-            if q["type"] in ("body-diagram", "muscle-diagram") and was_shown and isinstance(raw_value, list):
+            if q["type"] in ("body-diagram", "muscle-diagram", "joint-diagram") and was_shown and isinstance(raw_value, list):
                 response["region_count"] = len(raw_value)
 
             # Mark skip reason
