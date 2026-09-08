@@ -49,7 +49,7 @@ async def get_triage_history(
         
         triage_history = []
         for assessment in assessments:
-            triage_data = assessment.get("triage_assessment", {})
+            triage_data = (assessment.get("triage_assessment") or {})
             if triage_data:
                 triage_history.append({
                     "session_id": assessment.get("session_id"),
@@ -107,8 +107,8 @@ async def get_latest_triage(
         if not assessment:
             raise HTTPException(status_code=404, detail="No triage assessment found")
         
-        triage_data = assessment.get("triage_assessment", {})
-        structured_data = assessment.get("structured_assessment", {})
+        triage_data = (assessment.get("triage_assessment") or {})
+        structured_data = (assessment.get("structured_assessment") or {})
         
         return {
             "success": True,
@@ -201,7 +201,7 @@ async def get_triage_stats(
         confidence_scores = []
         
         for assessment in assessments:
-            triage_data = assessment.get("triage_assessment", {})
+            triage_data = (assessment.get("triage_assessment") or {})
             
             # Count alert levels
             alert_level = triage_data.get("alert_level", "UNKNOWN")
@@ -276,8 +276,8 @@ async def get_smart_insights(
                 "insights": []
             }
         
-        triage_data = assessment.get("triage_assessment", {})
-        structured_data = assessment.get("structured_assessment", {})
+        triage_data = (assessment.get("triage_assessment") or {})
+        structured_data = (assessment.get("structured_assessment") or {})
         
         # Generate insights based on data
         insights = generate_smart_insights(triage_data, structured_data)
@@ -471,7 +471,7 @@ async def get_demo_triage_latest(db = Depends(get_db)):
         if not assessment:
             raise HTTPException(status_code=404, detail="No demo triage assessment found")
         
-        triage_data = assessment.get("triage_assessment", {})
+        triage_data = (assessment.get("triage_assessment") or {})
         
         return {
             "success": True,

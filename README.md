@@ -32,6 +32,24 @@ python -m uvicorn app.api:app --reload --port 8000
 
 API docs available at http://localhost:8000/docs
 
+## Local demo (no Atlas, no OpenAI key required)
+
+```bash
+docker run -d --name ovis-mongo -p 27017:27017 mongo:7
+# .env: MONGODB_URI=mongodb://localhost:27017, SECRET_KEY=<random>, OPENAI_API_KEY=<optional>
+python scripts/seed_demo.py          # hospital + doctor + 2 patients with 6 weeks of history
+python -m uvicorn app.api:app --reload --port 8000
+```
+
+Demo accounts (password `demo1234` for all): patient `alex`, patient `jordan`, clinician `drlee`.
+Patients sign up with the clinician's access code `OVIS`; clinicians sign up with hospital code `HOSP`.
+Re-running `seed_demo.py` wipes and recreates the demo accounts and their data.
+
+Without `OPENAI_API_KEY`, Florence chat runs in fallback mode (placeholder replies, no AI triage);
+the questionnaire, analytics, and clinician dashboard work fully from stored data.
+
+Run the tests with `pytest` (no database needed).
+
 ## Project Structure
 
 ```
@@ -76,7 +94,7 @@ The backend exposes 47 endpoints across these routers:
 
 | Router | Prefix | Purpose |
 |--------|--------|---------|
-| login | `/token`, `/userinfo`, `/updateinfo` | Auth & user management |
+| login | `/token`, `/register`, `/userinfo`, `/updateinfo` | Auth & user management (`/register` is direct sign-up with an access code; `/otp/*` is the Twilio-verified variant) |
 | doctor | `/doctor` | Doctor-specific endpoints |
 | florence | `/florence` | AI chat & triage |
 | calendar | `/calendar` | Appointments |

@@ -1,10 +1,104 @@
 from fastapi import APIRouter, Depends, HTTPException
+from bson import ObjectId
+from bson.errors import InvalidId
 from .login import get_user, get_db
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import re
 import statistics
 
 analyticsrouter = APIRouter(prefix="/analytics", tags=["analytics"])
+
+
+def _structured_symptoms(doc):
+    structured = doc.get("structured_assessment") or {}
+    symptoms = structured.get("symptoms") if isinstance(structured, dict) else None
+    return symptoms if isinstance(symptoms, dict) else {}
+
+
+def _florence_summary(doc):
+    if doc.get("triage_status") == "generating":
+        return "Florence is preparing the assessment…"
+    if doc.get("triage_status") == "failed":
+        return "Chat saved — automated assessment unavailable"
+    symptoms = _structured_symptoms(doc)
+    rated = []
+    for name, data in symptoms.items():
+        if isinstance(data, dict) and data.get("severity_rating", 0) >= 3:
+            rated.append((data["severity_rating"], name.replace("_", " ").title()))
+    if not symptoms:
+        return "AI conversation completed"
+    if not rated:
+        return "Chat completed — no significant symptoms reported"
+    rated.sort(reverse=True)
+    parts = [f"{name} {sev}/5" for sev, name in rated[:3]]
+    return "Notable symptoms: " + ", ".join(parts)
+
+
+def _questionnaire_summary(doc):
+    summary = doc.get("clinical_summary") or {}
+    concerns = summary.get("areas_of_concern") or []
+    if not concerns:
+        return "No symptoms of concern reported"
+    parts = []
+    for concern in concerns[:3]:
+        label = concern.get("severity_label") or concern.get("severity_score")
+        parts.append(f"{concern['area']} ({label})" if label is not None else concern["area"])
+    text = "Concerns: " + ", ".join(parts)
+    if len(concerns) > 3:
+        text += f" +{len(concerns) - 3} more"
+    return text
+
+
+def _questionnaire_date(doc):
+    if doc.get("timestamp"):
+        return doc["timestamp"]
+    submitted = doc.get("submitted_at")
+    return submitted.isoformat() if isinstance(submitted, datetime) else "Unknown"
+
+
+def _questionnaire_as_assessment(doc):
+    """Present a questionnaire submission in the same shape as a Florence assessment for analytics."""
+    symptoms = {}
+    for section in doc.get("sections", []) or []:
+        score = section.get("severity_score")
+        if isinstance(score, (int, float)) and score > 0:
+            key = re.sub(r"[^a-z0-9]+", "_", (section.get("title") or section.get("clinical_area") or "symptom").lower()).strip("_")
+            symptoms[key] = {"severity_rating": int(min(5, max(1, round(score)))), "frequency_rating": int(min(5, max(1, round(score))))}
+    summary = doc.get("clinical_summary") or {}
+    alert_level = doc.get("alert_level")
+    if alert_level in ("RED", "ORANGE"):
+        level = "red" if alert_level == "RED" else "amber"
+    elif alert_level == "YELLOW" or summary.get("alert_flags"):
+        level = "amber"
+    else:
+        level = "none"
+    return {
+        "source": "questionnaire",
+        "created_at": _questionnaire_date(doc),
+        "structured_assessment": {"symptoms": symptoms},
+        "oncologist_notification_level": level,
+        "flag_for_oncologist": level != "none",
+        "alert_level": alert_level,
+    }
+
+
+def _assessments_in_range(db, user_id, start_iso, end_iso):
+    """Florence assessments + questionnaires for the user between two ISO timestamps, oldest first."""
+    florence = list(db["florence_assessments"].find({
+        "user_id": user_id,
+        "assessment_type": {"$ne": "questionnaire_triage"},
+        "created_at": {"$gte": start_iso, "$lte": end_iso},
+    }))
+    for doc in florence:
+        doc["source"] = "florence"
+    questionnaires = [
+        _questionnaire_as_assessment(q)
+        for q in db["symptom_questionnaires"].find({"user_id": user_id, "timestamp": {"$gte": start_iso, "$lte": end_iso}})
+    ]
+    items = florence + questionnaires
+    items.sort(key=lambda d: d.get("created_at") or "")
+    return items
 
 @analyticsrouter.get("/unified_assessments")
 async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)):
@@ -43,38 +137,32 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
         florence_responses = florence_collection.find({"user_id": user_id}).sort("created_at", -1)
         
         for conversation in florence_responses:
-            # Extract summary from assessment result
-            assessment_result = conversation.get("assessment_result", {})
-            summary_text = "AI conversation completed"
-            
-            if assessment_result and isinstance(assessment_result, dict):
-                summary_text = assessment_result.get("assessment_summary", "AI conversation completed")
-                if len(summary_text) > 100:
-                    summary_text = summary_text[:100] + "..."
-            
-            # Count conversation messages
+            # Triage generated from a questionnaire is surfaced on the questionnaire entry instead
+            if conversation.get("assessment_type") == "questionnaire_triage":
+                continue
+
             conv_history = conversation.get("conversation_history", [])
             message_count = len(conv_history)
             user_messages = len([msg for msg in conv_history if msg.get("role") == "user"])
-            
-            # Get oncologist notification level for alert coloring
+
             oncologist_level = conversation.get("oncologist_notification_level", "none")
             flag_for_oncologist = conversation.get("flag_for_oncologist", False)
-            
+
             assessment = {
                 "id": str(conversation.get("_id")),
                 "type": "florence_conversation",
                 "date": conversation.get("created_at", "Unknown"),
                 "title": "Florence AI Chat",
-                "summary": summary_text,
+                "summary": _florence_summary(conversation),
                 "data": {
                     "total_messages": message_count,
                     "user_messages": user_messages,
-                    "symptoms_assessed": list(conversation.get("structured_assessment", {}).get("symptoms", {}).keys()) if conversation.get("structured_assessment") else [],
+                    "symptoms_assessed": list(_structured_symptoms(conversation).keys()),
                     "ai_powered": conversation.get("ai_powered", False),
                     "conversation_length": message_count,
                     "session_id": conversation.get("session_id"),
-                    "assessment_summary": assessment_result,
+                    "alert_level": conversation.get("alert_level") if conversation.get("alert_level") != "PENDING" else None,
+                    "triage_status": conversation.get("triage_status"),
                     "oncologist_notification_level": oncologist_level,
                     "flag_for_oncologist": flag_for_oncologist
                 },
@@ -84,7 +172,40 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                 "flag_for_oncologist": flag_for_oncologist
             }
             unified_assessments.append(assessment)
-        
+
+        # Structured symptom questionnaires (the current daily check-in)
+        questionnaires = db["symptom_questionnaires"].find({"user_id": user_id}).sort("submitted_at", -1)
+        for questionnaire in questionnaires:
+            summary = questionnaire.get("clinical_summary") or {}
+            completion = questionnaire.get("completion") or {}
+            alert_level = questionnaire.get("alert_level")
+            oncologist_level = "none"
+            if alert_level in ("RED", "ORANGE"):
+                oncologist_level = "red" if alert_level == "RED" else "amber"
+            elif alert_level == "YELLOW" or summary.get("alert_flags"):
+                oncologist_level = "amber"
+
+            unified_assessments.append({
+                "id": str(questionnaire.get("_id")),
+                "type": "daily_checkin",
+                "date": _questionnaire_date(questionnaire),
+                "title": "Daily Symptom Check-in",
+                "summary": _questionnaire_summary(questionnaire),
+                "data": {
+                    "questions_answered": completion.get("questions_answered", len(questionnaire.get("answers", {}))),
+                    "symptom_count": summary.get("symptom_count", 0),
+                    "max_severity": summary.get("max_severity"),
+                    "max_severity_area": summary.get("max_severity_area"),
+                    "alert_flags": summary.get("alert_flags", []),
+                    "triage_status": questionnaire.get("triage_status"),
+                    "alert_level": alert_level,
+                },
+                "icon": "fa-clipboard-check",
+                "color": "#8b5cf6",
+                "oncologist_notification_level": oncologist_level,
+                "flag_for_oncologist": oncologist_level != "none",
+            })
+
         # Sort all assessments by date (newest first)
         unified_assessments.sort(key=lambda x: x["date"] if x["date"] != "Unknown" else "", reverse=True)
         
@@ -108,20 +229,22 @@ async def get_assessment_by_id(assessment_id: str, user = Depends(get_user), db 
     Get a specific assessment (Florence conversation or daily check-in) by ID
     """
     try:
-        from bson import ObjectId
-        
         user_id = user['username']
-        
+        try:
+            object_id = ObjectId(assessment_id)
+        except InvalidId:
+            raise HTTPException(status_code=400, detail="Invalid assessment ID format")
+
         # Try to find in Florence assessments first
         florence_collection = db["florence_assessments"]
         florence_assessment = florence_collection.find_one({
-            "_id": ObjectId(assessment_id),
+            "_id": object_id,
             "user_id": user_id
         })
         
         if florence_assessment:
             # Return detailed Florence assessment data
-            structured_assessment = florence_assessment.get("structured_assessment", {})
+            structured_assessment = (florence_assessment.get("structured_assessment") or {})
             
             # Extract symptom data from structured assessment if available
             symptoms_data = {}
@@ -154,6 +277,7 @@ async def get_assessment_by_id(assessment_id: str, user = Depends(get_user), db 
                 # Fallback for assessments without structured data - no symptom details available
                 symptoms_assessed = []  # No reliable symptom data without structured assessment
             
+            triage = florence_assessment.get("triage_assessment") or None
             return {
                 "success": True,
                 "assessment": {
@@ -170,16 +294,69 @@ async def get_assessment_by_id(assessment_id: str, user = Depends(get_user), db 
                     "symptoms_data": symptoms_data,
                     "avg_severity": sum([s.get("intensity", 0) for s in symptoms_data.values()]) / max(len(symptoms_data), 1),
                     "alerts_today": 1 if florence_assessment.get("flag_for_oncologist", False) else 0,
-                    "treatment_status": structured_assessment.get("treatment_status", "Currently in Treatment"),
+                    "treatment_status": (structured_assessment.get("treatment_status") or "undergoing_treatment").replace("_", " ").title(),
                     "oncologist_notification_level": florence_assessment.get("oncologist_notification_level", "none"),
-                    "flag_for_oncologist": florence_assessment.get("flag_for_oncologist", False)
+                    "flag_for_oncologist": florence_assessment.get("flag_for_oncologist", False),
+                    "alert_level": florence_assessment.get("alert_level"),
+                    "triage": triage,
+                    "mood_assessment": structured_assessment.get("mood_assessment"),
+                    "conversation_notes": structured_assessment.get("conversation_notes"),
+                    "conversation_history": florence_assessment.get("conversation_history", []),
                 }
             }
-        
-        # Try to find in daily check-ins (answers collection)
+
+        # Structured symptom questionnaire
+        questionnaire = db["symptom_questionnaires"].find_one({"_id": object_id, "user_id": user_id})
+        if questionnaire:
+            sections = []
+            for section in questionnaire.get("sections", []):
+                responses = [
+                    {
+                        "question_id": r.get("question_id"),
+                        "question_text": r.get("question_text"),
+                        "type": r.get("type"),
+                        "display_value": r.get("display_value"),
+                        "raw_value": r.get("raw_value"),
+                    }
+                    for r in section.get("responses", [])
+                    if r.get("was_shown") and r.get("display_value") is not None
+                ]
+                if responses:
+                    sections.append({
+                        "section_id": section.get("section_id"),
+                        "title": section.get("title"),
+                        "clinical_area": section.get("clinical_area"),
+                        "severity_score": section.get("severity_score"),
+                        "severity_label": section.get("severity_label"),
+                        "responses": responses,
+                    })
+
+            triage_doc = db["florence_assessments"].find_one(
+                {"session_id": f"questionnaire_{assessment_id}"},
+                {"_id": 0, "conversation_history": 0, "user_info": 0},
+            )
+            return {
+                "success": True,
+                "assessment": {
+                    "id": assessment_id,
+                    "type": "daily_checkin",
+                    "title": "Daily Symptom Check-in",
+                    "date": _questionnaire_date(questionnaire),
+                    "user_id": user_id,
+                    "completion": questionnaire.get("completion"),
+                    "clinical_summary": questionnaire.get("clinical_summary"),
+                    "sections": sections,
+                    "triage_status": questionnaire.get("triage_status"),
+                    "alert_level": questionnaire.get("alert_level") or (triage_doc or {}).get("alert_level"),
+                    "triage": (triage_doc or {}).get("triage_assessment"),
+                    "oncologist_notification_level": (triage_doc or {}).get("oncologist_notification_level", "none"),
+                }
+            }
+
+        # Legacy daily check-ins (answers collection)
         answers_collection = db["answers"]
         daily_assessment = answers_collection.find_one({
-            "_id": ObjectId(assessment_id),
+            "_id": object_id,
             "user_id": user_id
         })
         
@@ -200,10 +377,10 @@ async def get_assessment_by_id(assessment_id: str, user = Depends(get_user), db 
         
         # Assessment not found
         raise HTTPException(status_code=404, detail="Assessment not found")
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
-        if "invalid ObjectId" in str(e).lower():
-            raise HTTPException(status_code=400, detail="Invalid assessment ID format")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch assessment: {str(e)}"
@@ -221,20 +398,14 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
         user_id = user['username']
         florence_collection = db["florence_assessments"]
         
-        # Get target week date range based on offset
-        today = datetime.now()
+        # Get target week date range based on offset (UTC, whole days)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         current_week_start = today - timedelta(days=today.weekday())
         target_week_start = current_week_start - timedelta(weeks=week_offset)
-        target_week_end = target_week_start + timedelta(days=6)
+        target_week_end = target_week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
         
-        # Query assessments from the target week
-        florence_responses = list(florence_collection.find({
-            "user_id": user_id,
-            "created_at": {
-                "$gte": target_week_start.isoformat(),
-                "$lte": target_week_end.isoformat()
-            }
-        }).sort("created_at", 1))
+        # Florence assessments + symptom questionnaires from the target week
+        florence_responses = _assessments_in_range(db, user_id, target_week_start.isoformat(), target_week_end.isoformat())
         
         # Calculate week label for display
         if week_offset == 0:
@@ -297,8 +468,7 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
                 day_symptoms = defaultdict(list)
                 
                 for assessment in day_assessments:
-                    structured = assessment.get("structured_assessment", {})
-                    symptoms = structured.get("symptoms", {})
+                    symptoms = _structured_symptoms(assessment)
                     
                     if symptoms:  # Only process if symptoms exist
                         for symptom_name, symptom_data in symptoms.items():
@@ -450,6 +620,10 @@ async def get_weekly_analytics(week_offset: int = 0, user = Depends(get_user), d
             "success": True,
             "data": {
                 "totalAssessments": total_assessments,
+                "sources": {
+                    "florence": sum(1 for a in florence_responses if a.get("source") == "florence"),
+                    "questionnaire": sum(1 for a in florence_responses if a.get("source") == "questionnaire"),
+                },
                 "totalAlerts": total_alerts,
                 "mostConcerningSymptom": most_concerning_symptom,
                 "overallTrend": overall_trend,
@@ -486,7 +660,7 @@ async def get_monthly_analytics(month_offset: int = 0, user = Depends(get_user),
         florence_collection = db["florence_assessments"]
         
         # Get target month date range based on offset
-        today = datetime.now()
+        today = datetime.now(timezone.utc)
         
         # Calculate target month
         target_year = today.year
@@ -502,18 +676,12 @@ async def get_monthly_analytics(month_offset: int = 0, user = Depends(get_user),
             
         # Get first and last day of target month
         from calendar import monthrange
-        first_day = datetime(target_year, target_month, 1)
+        first_day = datetime(target_year, target_month, 1, tzinfo=timezone.utc)
         last_day_num = monthrange(target_year, target_month)[1]
-        last_day = datetime(target_year, target_month, last_day_num, 23, 59, 59)
+        last_day = datetime(target_year, target_month, last_day_num, 23, 59, 59, tzinfo=timezone.utc)
         
-        # Query assessments from the target month
-        florence_responses = list(florence_collection.find({
-            "user_id": user_id,
-            "created_at": {
-                "$gte": first_day.isoformat(),
-                "$lte": last_day.isoformat()
-            }
-        }).sort("created_at", 1))
+        # Florence assessments + symptom questionnaires from the target month
+        florence_responses = _assessments_in_range(db, user_id, first_day.isoformat(), last_day.isoformat())
         
         # Calculate month label for display
         month_names = ["", "January", "February", "March", "April", "May", "June",
@@ -567,8 +735,7 @@ async def get_monthly_analytics(month_offset: int = 0, user = Depends(get_user),
                         total_alerts += 1
                     
                     # Process symptoms by day
-                    structured = assessment.get("structured_assessment", {})
-                    symptoms = structured.get("symptoms", {})
+                    symptoms = _structured_symptoms(assessment)
                     
                     daily_severities = []
                     for symptom_name, symptom_data in symptoms.items():
@@ -608,6 +775,10 @@ async def get_monthly_analytics(month_offset: int = 0, user = Depends(get_user),
             "success": True,
             "data": {
                 "totalAssessments": len(florence_responses),
+                "sources": {
+                    "florence": sum(1 for a in florence_responses if a.get("source") == "florence"),
+                    "questionnaire": sum(1 for a in florence_responses if a.get("source") == "questionnaire"),
+                },
                 "totalAlerts": total_alerts,
                 "alertsByDay": alerts_by_day,
                 "severityByDay": severity_by_day,

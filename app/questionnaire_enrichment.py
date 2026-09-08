@@ -136,14 +136,13 @@ def _compute_section_severity(section_def: dict, raw_answers: Dict[str, Any]) ->
         labels = {0: "None", 1: "Mild", 2: "Moderate", 3: "Significant", 4: "Severe"}
         return score, labels.get(score, "Unknown")
 
-    # Default: direct rating value
-    # Find the question def to get its label
+    # Default: direct rating value, offset so the lowest option (e.g. "Very good") scores 0
     for q in section_def["questions"]:
         if q["id"] == source_id:
             options = q.get("options", {})
             label = options.get(raw_value, str(raw_value))
-            score = raw_value if isinstance(raw_value, (int, float)) else 0
-            return score, label
+            score = int(raw_value - q.get("min", 0)) if isinstance(raw_value, (int, float)) else 0
+            return max(score, 0), label
 
     return None, None
 

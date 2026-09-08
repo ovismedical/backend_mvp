@@ -34,7 +34,7 @@ def get_patients_by_doctor(doctor=Depends(get_user), db=Depends(get_db)):
 
 @doctorrouter.get("/answers")
 def get_patient_answers(user_id: str, doctor=Depends(get_user), db=Depends(get_db)):
-    _require_doctor(doctor)
+    _require_doctor_owns_patient(doctor, user_id)
     answers = list(db["answers"].find({"user_id": user_id}).sort("timestamp", -1))
     for a in answers:
         a["_id"] = str(a["_id"])
@@ -68,7 +68,7 @@ def get_patients_details(doctor=Depends(get_user), db=Depends(get_db)):
             sort=[("created_at", -1)],
         )
         profile["latest_alert_level"] = (
-            latest.get("triage_assessment", {}).get("alert_level") if latest else None
+            (latest.get("triage_assessment") or {}).get("alert_level") if latest else None
         )
         profile["last_assessment_date"] = latest.get("created_at") if latest else None
         patients.append(profile)

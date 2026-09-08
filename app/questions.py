@@ -1,9 +1,10 @@
 from .login import get_db, get_user
-from .achievements import check_and_unlock_achievements
+from .achievements import update_daily_streak, streak_is_current
 from fastapi import APIRouter
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Header, status
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
+from typing import Optional
 import json
 import os
 
@@ -15,7 +16,6 @@ QUESTIONS_FILE = os.getenv(
 )
 
 class SubmissionRequest(BaseModel):
-    user_id: str
     answers: list
 
 class NextQuestionRequest(BaseModel):
@@ -104,74 +104,48 @@ async def get_next_question(request: NextQuestionRequest):
         raise HTTPException(status_code=500, detail=f"Failed to get next question: {str(e)}")
 
 @questionsrouter.post("/submit")
-async def submit_answers(submission: SubmissionRequest, db = Depends(get_db)):
+async def submit_answers(
+    submission: SubmissionRequest,
+    current_user=Depends(get_user),
+    db = Depends(get_db),
+    x_timezone: Optional[str] = Header(default=None, alias="X-Timezone"),
+):
     try:
-        # Store the submission in the answers collection
+        username = current_user["username"]
         answers_collection = db["answers"]
         submission_data = {
-            "user_id": submission.user_id,
+            "user_id": username,
             "answers": submission.answers,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "date": datetime.now(timezone.utc).strftime("%m/%d/%Y")
         }
         answers_collection.insert_one(submission_data)
-        
-        # Update user's streak and last completion date
-        users = db["users"]
-        today = datetime.now(timezone.utc).strftime("%m/%d/%Y")
-        
-        user = users.find_one({"username": submission.user_id})
-        if user:
-            current_streak = user.get("streak", 0)
-            last_completion = user.get("last_completion")
-            
-            # If completed today already, don't update streak
-            if last_completion == today:
-                return {"message": "Answers submitted successfully", "streak": current_streak}
-            
-            # If completed yesterday, increment streak
-            yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%m/%d/%Y")
-            if last_completion == yesterday:
-                new_streak = current_streak + 1
-            else:
-                new_streak = 1  # Reset streak if more than a day gap
 
-            longest_streak = max(new_streak, user.get("longest_streak", 0))
-            users.update_one(
-                {"username": submission.user_id},
-                {"$set": {"streak": new_streak, "longest_streak": longest_streak, "last_completion": today}}
-            )
-            newly_unlocked = check_and_unlock_achievements(db, submission.user_id, longest_streak)
-            return {"message": "Answers submitted successfully", "streak": new_streak, "newly_unlocked": newly_unlocked}
-        
-        return {"message": "Answers submitted successfully"}
-        
+        streak, newly_unlocked = update_daily_streak(db, username, x_timezone)
+        if streak is None:
+            return {"message": "Answers submitted successfully"}
+        return {"message": "Answers submitted successfully", "streak": streak, "newly_unlocked": newly_unlocked}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit answers: {str(e)}")
 
 @questionsrouter.get("/getstreak")
-def get_streak(username, db=Depends(get_db)):
+def get_streak(
+    current_user=Depends(get_user),
+    db=Depends(get_db),
+    x_timezone: Optional[str] = Header(default=None, alias="X-Timezone"),
+):
+    username = current_user["username"]
     users = db["users"]
     user = users.find_one({"username": username}, {"_id": 0, "password": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     longest_streak = user.get("longest_streak", 0)
-    today = datetime.now(timezone.utc).date()
-    last_completion = user.get("last_completion")
+    if streak_is_current(user.get("last_completion"), x_timezone):
+        return {"streak": user.get("streak", 0), "longest_streak": longest_streak,
+                "last_completion": user.get("last_completion")}
 
-    if not last_completion:
-        return {"streak": 0, "longest_streak": longest_streak}
-
-    try:
-        last_check_in = datetime.strptime(last_completion, "%m/%d/%Y").date()
-    except (ValueError, TypeError):
+    if user.get("streak", 0):
         users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return {"streak": 0, "longest_streak": longest_streak}
-
-    if last_check_in == today or last_check_in == today - timedelta(days=1):
-        current = user.get("streak", 0)
-        return {"streak": current, "longest_streak": longest_streak}
-    else:
-        users.update_one({"username": username}, {"$set": {"streak": 0}})
-        return {"streak": 0, "longest_streak": longest_streak}
+    return {"streak": 0, "longest_streak": longest_streak, "last_completion": user.get("last_completion")}

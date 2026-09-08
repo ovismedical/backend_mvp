@@ -103,8 +103,8 @@ def get_user (token: str = Depends(oauth2_scheme), db = Depends(get_db)):
     return jsonable_encoder(user)
 
 
-def verify_code(code, user_dict):
-    db = get_db()
+def verify_code(code, user_dict, db=None):
+    db = db if db is not None else get_db()
     doctors = db["doctors"]
     doctor = doctors.find_one({"code":code})
     hospitals = db["hospitals"]
@@ -135,13 +135,61 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
         token = create_access_token({"sub": user["username"]})
         return {"access_token": token, "token_type": "Bearer"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+
+class RegisterRequest(UserCreate):
+    full_name: str = ""
+    dob: str = ""
+    sex: Optional[str] = None
+
+
+@loginrouter.post("/register", status_code=201)
+async def register(req: RegisterRequest, db = Depends(get_db)):
+    if db["users"].find_one({"username": req.username}) or db["doctors"].find_one({"username": req.username}):
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    user_dict = req.model_dump()
+    user_dict["full_name"] = req.full_name.strip() or req.username
+    user_dict["password"] = hash_password(req.password)
+    user_dict = verify_code(req.access_code, user_dict, db)
+    user_dict["created_at"] = datetime.now(timezone.utc).isoformat()
+
+    if user_dict.get("isDoctor"):
+        user_dict["patients"] = []
+        db["doctors"].insert_one(user_dict)
+        role = "doctor"
+    else:
+        user_dict.update({"streak": 0, "longest_streak": 0})
+        db["users"].insert_one(user_dict)
+        db["doctors"].update_one({"username": user_dict["doctor"]}, {"$addToSet": {"patients": req.username}})
+        role = "patient"
+
+    return {"message": "Account created successfully", "username": req.username, "role": role}
+
+def otp_configured() -> bool:
+    return all(os.getenv(k) for k in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID"))
+
+
+@loginrouter.get("/auth/config")
+async def auth_config():
+    """Public capability flags the frontend uses to pick a registration flow."""
+    from .inference import get_gateway
+    return {
+        "registration": {"otp_required": otp_configured(), "direct_endpoint": "/register"},
+        "florence_available": get_gateway().available(),
+    }
+
+
 @loginrouter.post("/updateinfo")
 async def updateinfo(info: UserInfo, user = Depends(get_user), db = Depends(get_db)):
     db["users"].update_one({"username":user["username"]}, {"$set":info.dict()})
     return ({"details": "Succesfully updated user info"})
 
 @loginrouter.get("/userinfo")
-async def get_info(user = Depends(get_user)):
+async def get_info(user = Depends(get_user), db = Depends(get_db)):
+    if not user.get("isDoctor") and user.get("doctor"):
+        doctor = db["doctors"].find_one({"username": user["doctor"]}, {"_id": 0, "full_name": 1})
+        if doctor and doctor.get("full_name"):
+            user["doctor_name"] = doctor["full_name"]
     return user
 

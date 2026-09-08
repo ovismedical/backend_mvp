@@ -1,106 +1,119 @@
 """
 FastAPI Application Setup
-Clean, focused main application file with only app configuration and router registration
+App configuration, middleware, and router registration.
 """
 
-from fastapi import FastAPI, Depends
+import logging
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from datetime import datetime, timezone
-from .florence import florence_ai
-from .login import get_db, get_client
 
-# Load environment variables
 load_dotenv()
 
-# Create FastAPI application
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("ovis")
+
+from .login import get_db, get_client, get_user  # noqa: E402
+from .inference import get_gateway  # noqa: E402
+from .florence import ensure_session_index  # noqa: E402
+
+
+def cors_origins() -> list[str]:
+    """Comma-separated CORS_ORIGINS; '*' when unset so existing deployments keep working."""
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw:
+        logger.warning("CORS_ORIGINS not set - allowing all origins")
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    gateway = get_gateway()
+    if gateway.available():
+        logger.info("inference ready: %s", gateway.describe())
+    else:
+        logger.warning("no inference provider configured - Florence runs in fallback mode")
+    try:
+        ensure_session_index(get_db())
+    except Exception as e:
+        logger.warning("could not prepare session indexes: %s", type(e).__name__)
+    yield
+
+
 app = FastAPI(
     title="OVIS Medical Backend",
     description="Medical application backend with Florence AI, analytics, and patient management",
-    version="1.0.0"
+    version="1.1.0",
+    lifespan=lifespan,
 )
 
-# Configure CORS middleware
+origins = cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to specific domains in production
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import and register routers
-from .login import loginrouter
-from .doctor import doctorrouter
-from .questions import questionsrouter
-from .florence import florencerouter
-from .calendar import calendarrouter
-from .otp_routes import otprouter
-from .analytics import analyticsrouter
-from .triage_api import trierouter
-from .symptom_questionnaire import symptom_router
-from .admin import adminrouter
-from .achievements import achievementsrouter
+from .login import loginrouter  # noqa: E402
+from .doctor import doctorrouter  # noqa: E402
+from .questions import questionsrouter  # noqa: E402
+from .florence import florencerouter  # noqa: E402
+from .calendar import calendarrouter  # noqa: E402
+from .otp_routes import otprouter  # noqa: E402
+from .analytics import analyticsrouter  # noqa: E402
+from .triage_api import trierouter  # noqa: E402
+from .symptom_questionnaire import symptom_router  # noqa: E402
+from .admin import adminrouter  # noqa: E402
+from .achievements import achievementsrouter  # noqa: E402
 
-# Register all routers
-app.include_router(loginrouter)
-app.include_router(doctorrouter)
-app.include_router(questionsrouter)
-app.include_router(florencerouter)
-app.include_router(calendarrouter)
-app.include_router(otprouter)
-app.include_router(analyticsrouter)
-app.include_router(trierouter)
-app.include_router(symptom_router)
-app.include_router(adminrouter)
-app.include_router(achievementsrouter)
+for router in (loginrouter, doctorrouter, questionsrouter, florencerouter, calendarrouter, otprouter,
+               analyticsrouter, trierouter, symptom_router, adminrouter, achievementsrouter):
+    app.include_router(router)
 
-# Health check endpoint
+
 @app.get("/health")
 async def health_check():
-    """Enhanced health check with dependency status"""
-    # Basic health - always return quickly
     health_status = {
         "status": "healthy",
         "service": "OVIS Medical Backend",
-        "version": "1.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "version": app.version,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    
-    # Add optional dependency checks (non-blocking)
     try:
-        client = get_client()
-        client.admin.command('ping')
+        get_client().admin.command("ping")
         health_status["database"] = "connected"
     except Exception:
         health_status["database"] = "disconnected"
-    
-    # Florence AI status (check if initialized, don't initialize)
-    health_status["florence_ai"] = "ready" if florence_ai.client else "initializing"
-    
+    health_status["florence_ai"] = "ready" if get_gateway().available() else "fallback"
     return health_status
 
-# Root endpoint
+
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "OVIS Medical Backend API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "redoc": "/redoc"
-    }
+    return {"message": "OVIS Medical Backend API", "version": app.version, "docs": "/docs", "redoc": "/redoc"}
+
 
 @app.get("/render-health")
 async def render_health_check():
-    """Ultra-lightweight health check for Render monitoring"""
     return {"status": "ok"}
 
+
 @app.get("/configure_db")
-async def configure_db(db = Depends(get_db)):
-    """Configure database indexes for TTL collections"""
-    auth_states = db["auth_states"]
-    auth_states.create_index("expires_at", expireAfterSeconds=1)
-    temp_users = db["temp_users"]
-    temp_users.create_index("created_at", expireAfterSeconds=600)
+async def configure_db(user=Depends(get_user), db=Depends(get_db)):
+    """Create TTL indexes. Clinician-only; safe to re-run."""
+    if not user.get("isDoctor"):
+        raise HTTPException(status_code=403, detail="Clinician access required")
+    db["auth_states"].create_index("expires_at", expireAfterSeconds=1)
+    db["temp_users"].create_index("created_at", expireAfterSeconds=600)
+    ensure_session_index(db)
     return {"message": "Database indexes configured successfully"}

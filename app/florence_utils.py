@@ -3,404 +3,67 @@ Florence AI Shared Utilities
 Shared functionality for Florence conversation system using structured assessment format
 """
 
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 from datetime import datetime, timezone
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 
-# Shared data models based on telenurse/gpt_json.py format
-class SymptomAssessment(BaseModel):
-    frequency_rating: int  # 1-5 scale
-    severity_rating: int   # 1-5 scale
-    key_indicators: List[str]  # Patient quotes or observations
-    additional_notes: Optional[str] = None
-    location: Optional[str] = None  # For pain symptoms
 
-class StructuredAssessment(BaseModel):
-    timestamp: str
-    patient_id: str
-    symptoms: Dict[str, SymptomAssessment]  # cough, nausea, lack_of_appetite, fatigue, pain
+# ---------------------------------------------------------------------------
+# Structured-output schemas (OpenAI Responses API `text_format`).
+# Every field is required (Optional = nullable) as strict JSON schema demands.
+# ---------------------------------------------------------------------------
+class SymptomRating(BaseModel):
+    frequency_rating: int = Field(ge=1, le=5, description="How often the symptom occurs, 1 (rare) to 5 (constant)")
+    severity_rating: int = Field(ge=1, le=5, description="How severe the symptom is, 1 (minimal) to 5 (severe)")
+    key_indicators: List[str] = Field(description="Direct patient quotes or observations supporting the ratings")
+    additional_notes: Optional[str] = Field(description="Relevant context, or null")
+
+
+class PainRating(SymptomRating):
+    location: Optional[str] = Field(description="Where the pain is located, or null if not mentioned")
+
+
+class SymptomSet(BaseModel):
+    cough: SymptomRating
+    nausea: SymptomRating
+    lack_of_appetite: SymptomRating
+    fatigue: SymptomRating
+    pain: PainRating
+
+
+class SymptomAssessmentOutput(BaseModel):
+    symptoms: SymptomSet
     flag_for_oncologist: bool
-    flag_reason: Optional[str] = None
-    mood_assessment: Optional[str] = None
-    conversation_notes: Optional[str] = None
-    oncologist_notification_level: str  # "none", "amber", "red"
-    treatment_status: str  # "undergoing_treatment", "in_remission"
+    flag_reason: Optional[str]
+    mood_assessment: Optional[str] = Field(description="Brief assessment of the patient's mood and outlook")
+    conversation_notes: Optional[str] = Field(description="Clinically relevant notes from the conversation")
+    oncologist_notification_level: Literal["none", "amber", "red"]
+    treatment_status: Literal["undergoing_treatment", "in_remission"]
 
-class ConversationMessage(BaseModel):
-    role: str  # "user", "assistant", "system"
-    content: str
-    timestamp: Optional[str] = None
 
-class FlorenceResponse(BaseModel):
-    response: str
-    conversation_state: str = "starting"
-    progress: float = 0.0
-    is_complete: bool = False
-    error: Optional[str] = None
+class DiagnosisPrediction(BaseModel):
+    suspected_diagnosis: str
+    probability: Literal["low", "medium", "high"]
+    urgency: int = Field(ge=1, le=5, description="1=routine monitoring, 2=scheduled follow-up, 3=same-week review, 4=same-day attention, 5=immediate emergency care")
+    reasoning: str
 
-class SessionState(BaseModel):
-    session_id: str
-    user_id: str
-    status: str = "active"
-    conversation_state: str = "starting"
-    ai_available: bool = False
-    created_at: str
-    completed_at: Optional[str] = None
+
+class TriageAssessmentOutput(BaseModel):
+    clinical_reasoning: str = Field(description="Step-by-step reasoning: key symptoms, pattern recognition, differentials, risk stratification, treatment context")
+    diagnosis_predictions: List[DiagnosisPrediction]
+    alert_level: Literal["GREEN", "YELLOW", "ORANGE", "RED"] = Field(description="Overall urgency based on the highest-urgency diagnosis")
+    alert_rationale: str
+    key_symptoms: List[str]
+    recommended_timeline: str = Field(description="Specific recommended timeline for medical review")
+    confidence_level: Literal["low", "medium", "high"]
+    clinical_notes: Optional[str]
+    treatment_status: Literal["undergoing_treatment", "in_remission"]
+
 
 # Constants
 TARGET_SYMPTOMS = {"fatigue", "lack_of_appetite", "nausea", "cough", "pain"}
 PAIN_KEYWORDS = ["pain", "hurt", "ache", "sore", "discomfort"]
-
-# Assessment function schema for OpenAI function calling
-ASSESSMENT_FUNCTION_SCHEMA = {
-    "name": "record_symptom_assessment",
-    "description": "Record a comprehensive symptom assessment for a cancer patient based on conversation",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "timestamp": {
-                "type": "string",
-                "description": "Current date and time of the assessment"
-            },
-            "patient_id": {
-                "type": "string",
-                "description": "Unique identifier for the patient"
-            },
-            "symptoms": {
-                "type": "object",
-                "properties": {
-                    "cough": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}},
-                            "additional_notes": {"type": "string"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "nausea": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}},
-                            "additional_notes": {"type": "string"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "lack_of_appetite": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}},
-                            "additional_notes": {"type": "string"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "fatigue": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}},
-                            "additional_notes": {"type": "string"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "pain": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                            "location": {"type": "string"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}},
-                            "additional_notes": {"type": "string"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    }
-                },
-                "required": ["cough", "nausea", "lack_of_appetite", "fatigue", "pain"]
-            },
-            "flag_for_oncologist": {"type": "boolean"},
-            "flag_reason": {"type": "string"},
-            "mood_assessment": {"type": "string"},
-            "conversation_notes": {"type": "string"},
-            "oncologist_notification_level": {
-                "type": "string",
-                "enum": ["none", "amber", "red"]
-            },
-            "treatment_status": {
-                "type": "string",
-                "enum": ["undergoing_treatment", "in_remission"]
-            }
-        },
-        "required": ["timestamp", "patient_id", "symptoms", "flag_for_oncologist", "oncologist_notification_level", "treatment_status"]
-    }
-}
-
-# Triage function schema for OpenAI function calling
-TRIAGE_FUNCTION_SCHEMA = {
-    "name": "record_triage_assessment",
-    "description": "Record a clinical triage assessment with step-by-step reasoning and structured diagnosis predictions",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "timestamp": {
-                "type": "string",
-                "description": "Current date and time of the triage assessment"
-            },
-            "patient_id": {
-                "type": "string", 
-                "description": "Unique identifier for the patient"
-            },
-            "clinical_reasoning": {
-                "type": "string",
-                "description": "Detailed step-by-step clinical reasoning process. Think through: 1) Key symptoms identified, 2) Pattern recognition, 3) Differential diagnosis considerations, 4) Risk stratification factors, 5) Treatment context implications"
-            },
-            "diagnosis_predictions": {
-                "type": "array",
-                "description": "List of diagnosis predictions with structured assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "suspected_diagnosis": {
-                            "type": "string",
-                            "description": "Name of the suspected medical condition or diagnosis"
-                        },
-                        "probability": {
-                            "type": "string",
-                            "enum": ["low", "medium", "high"],
-                            "description": "Probability assessment based on clinical evidence"
-                        },
-                        "urgency": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 5,
-                            "description": "Urgency level: 1=routine monitoring, 2=scheduled follow-up, 3=same-week review, 4=same-day attention, 5=immediate emergency care"
-                        },
-                        "reasoning": {
-                            "type": "string",
-                            "description": "Detailed clinical reasoning supporting this specific diagnosis prediction"
-                        }
-                    },
-                    "required": ["suspected_diagnosis", "probability", "urgency", "reasoning"]
-                }
-            },
-            "alert_level": {
-                "type": "string",
-                "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
-                "description": "Overall clinical urgency level based on highest urgency diagnosis"
-            },
-            "alert_rationale": {
-                "type": "string",
-                "description": "Clear reasoning for the assigned alert level"
-            },
-            "key_symptoms": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Key symptoms that influenced the triage decision"
-            },
-            "recommended_timeline": {
-                "type": "string",
-                "description": "Specific recommended timeline for medical review"
-            },
-            "confidence_level": {
-                "type": "string",
-                "enum": ["low", "medium", "high"],
-                "description": "Overall confidence in the triage assessment"
-            },
-            "clinical_notes": {
-                "type": "string", 
-                "description": "Additional clinical observations or concerns"
-            },
-            "treatment_status": {
-                "type": "string",
-                "enum": ["undergoing_treatment", "in_remission"],
-                "description": "Patient's current treatment status"
-            }
-        },
-        "required": ["timestamp", "patient_id", "clinical_reasoning", "diagnosis_predictions", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "confidence_level", "treatment_status"]
-    }
-}
-
-# Cantonese version of the triage function schema
-TRIAGE_FUNCTION_SCHEMA_ZH = {
-    "name": "record_triage_assessment",
-    "description": "記錄臨床分流評估，包含逐步推理過程和結構化診斷預測",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "timestamp": {
-                "type": "string",
-                "description": "分流評估的當前日期和時間"
-            },
-            "patient_id": {
-                "type": "string", 
-                "description": "病人的唯一識別碼"
-            },
-            "clinical_reasoning": {
-                "type": "string",
-                "description": "詳細的逐步臨床推理過程。思考：1) 識別的關鍵症狀，2) 模式識別，3) 鑑別診斷考慮，4) 風險分層因素，5) 治療背景影響"
-            },
-            "diagnosis_predictions": {
-                "type": "array",
-                "description": "結構化評估的診斷預測清單",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "suspected_diagnosis": {
-                            "type": "string",
-                            "description": "疑似醫療病況或診斷的名稱"
-                        },
-                        "probability": {
-                            "type": "string",
-                            "enum": ["low", "medium", "high"],
-                            "description": "基於臨床證據的機率評估"
-                        },
-                        "urgency": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 5,
-                            "description": "緊急程度級別：1=常規監察，2=計劃追蹤，3=同週檢查，4=當日關注，5=立即急救護理"
-                        },
-                        "reasoning": {
-                            "type": "string",
-                            "description": "支持此特定診斷預測的詳細臨床推理"
-                        }
-                    },
-                    "required": ["suspected_diagnosis", "probability", "urgency", "reasoning"]
-                }
-            },
-            "alert_level": {
-                "type": "string",
-                "enum": ["GREEN", "YELLOW", "ORANGE", "RED"],
-                "description": "基於最高緊急程度診斷的整體臨床緊急級別"
-            },
-            "alert_rationale": {
-                "type": "string",
-                "description": "指定警報級別的清晰推理"
-            },
-            "key_symptoms": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "影響分流決定的關鍵症狀"
-            },
-            "recommended_timeline": {
-                "type": "string",
-                "description": "建議的醫療檢查具體時間表"
-            },
-            "confidence_level": {
-                "type": "string",
-                "enum": ["low", "medium", "high"],
-                "description": "分流評估的整體信心水平"
-            },
-            "clinical_notes": {
-                "type": "string", 
-                "description": "額外的臨床觀察或關注事項"
-            },
-            "treatment_status": {
-                "type": "string",
-                "enum": ["undergoing_treatment", "in_remission"],
-                "description": "病人當前的治療狀況"
-            }
-        },
-        "required": ["timestamp", "patient_id", "clinical_reasoning", "diagnosis_predictions", "alert_level", "alert_rationale", "key_symptoms", "recommended_timeline", "confidence_level", "treatment_status"]
-    }
-}
-
-# Cantonese version of the assessment function schema
-ASSESSMENT_FUNCTION_SCHEMA_ZH = {
-    "name": "record_symptom_assessment",
-    "description": "根據對話為癌症患者記錄全面的症狀評估",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "timestamp": {
-                "type": "string",
-                "description": "評估的當前日期和時間"
-            },
-            "patient_id": {
-                "type": "string",
-                "description": "病人的唯一標識符"
-            },
-            "symptoms": {
-                "type": "object",
-                "properties": {
-                    "cough": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "咳嗽頻率評級（1-5）"},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "咳嗽嚴重程度評級（1-5）"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
-                            "additional_notes": {"type": "string", "description": "額外註記"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "nausea": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "噁心頻率評級（1-5）"},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "噁心嚴重程度評級（1-5）"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
-                            "additional_notes": {"type": "string", "description": "額外註記"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "lack_of_appetite": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "食慾不振頻率評級（1-5）"},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "食慾不振嚴重程度評級（1-5）"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
-                            "additional_notes": {"type": "string", "description": "額外註記"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "fatigue": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疲勞頻率評級（1-5）"},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疲勞嚴重程度評級（1-5）"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
-                            "additional_notes": {"type": "string", "description": "額外註記"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    },
-                    "pain": {
-                        "type": "object",
-                        "properties": {
-                            "frequency_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疼痛頻率評級（1-5）"},
-                            "severity_rating": {"type": "integer", "minimum": 1, "maximum": 5, "description": "疼痛嚴重程度評級（1-5）"},
-                            "location": {"type": "string", "description": "疼痛位置"},
-                            "key_indicators": {"type": "array", "items": {"type": "string"}, "description": "病人的關鍵指標和引述"},
-                            "additional_notes": {"type": "string", "description": "額外註記"}
-                        },
-                        "required": ["frequency_rating", "severity_rating", "key_indicators"]
-                    }
-                },
-                "required": ["cough", "nausea", "lack_of_appetite", "fatigue", "pain"]
-            },
-            "flag_for_oncologist": {"type": "boolean", "description": "是否需要通知腫瘤科醫生"},
-            "flag_reason": {"type": "string", "description": "通知原因"},
-            "mood_assessment": {"type": "string", "description": "情緒評估"},
-            "conversation_notes": {"type": "string", "description": "對話記錄"},
-            "oncologist_notification_level": {
-                "type": "string",
-                "enum": ["none", "amber", "red"],
-                "description": "腫瘤科醫生通知級別"
-            },
-            "treatment_status": {
-                "type": "string",
-                "enum": ["undergoing_treatment", "in_remission"],
-                "description": "治療狀態"
-            }
-        },
-        "required": ["timestamp", "patient_id", "symptoms", "flag_for_oncologist", "oncologist_notification_level", "treatment_status"]
-    }
-}
 
 def load_florence_system_prompt(language: str = "en") -> str:
     """Load Florence system prompt from prompt file based on language"""

@@ -1,6 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from datetime import datetime, timezone, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
 from .login import get_user, get_db
+
+DATE_FMT = "%m/%d/%Y"
+
+
+def patient_now(tz_name: Optional[str]) -> datetime:
+    """Current time in the patient's IANA timezone (from the X-Timezone header); UTC if missing/invalid."""
+    if tz_name:
+        try:
+            return datetime.now(ZoneInfo(tz_name))
+        except Exception:
+            pass
+    return datetime.now(timezone.utc)
+
+
+def streak_is_current(last_completion: Optional[str], tz_name: Optional[str]) -> bool:
+    """True when the last completion was today or yesterday in the patient's local calendar."""
+    if not last_completion:
+        return False
+    try:
+        last_date = datetime.strptime(last_completion, DATE_FMT).date()
+    except (ValueError, TypeError):
+        return False
+    today = patient_now(tz_name).date()
+    return last_date in (today, today - timedelta(days=1))
 
 achievementsrouter = APIRouter(prefix="/achievements", tags=["achievements"])
 
@@ -104,8 +130,37 @@ def check_and_unlock_achievements(db, username: str, longest_streak: int):
     return newly_unlocked
 
 
+def update_daily_streak(db, username: str, tz_name: Optional[str] = None):
+    """Advance the user's daily streak for today (patient-local date). Returns (streak, newly_unlocked)."""
+    users = db["users"]
+    user = users.find_one({"username": username})
+    if not user:
+        return None, []
+
+    now = patient_now(tz_name)
+    today = now.strftime(DATE_FMT)
+    yesterday = (now - timedelta(days=1)).strftime(DATE_FMT)
+    current_streak = user.get("streak", 0)
+    last_completion = user.get("last_completion")
+
+    if last_completion == today:
+        return current_streak, []
+
+    new_streak = current_streak + 1 if last_completion == yesterday else 1
+    longest_streak = max(new_streak, user.get("longest_streak", 0))
+    users.update_one(
+        {"username": username},
+        {"$set": {"streak": new_streak, "longest_streak": longest_streak, "last_completion": today}},
+    )
+    return new_streak, check_and_unlock_achievements(db, username, longest_streak)
+
+
 @achievementsrouter.get("/me")
-async def get_my_achievements(user=Depends(get_user), db=Depends(get_db)):
+async def get_my_achievements(
+    user=Depends(get_user),
+    db=Depends(get_db),
+    x_timezone: Optional[str] = Header(default=None, alias="X-Timezone"),
+):
     """Get all achievements for the authenticated user.
 
     Returns achievement definitions merged with user's unlock state,
@@ -120,17 +175,9 @@ async def get_my_achievements(user=Depends(get_user), db=Depends(get_db)):
         current_streak = user_doc.get("streak", 0) if user_doc else 0
         longest_streak = user_doc.get("longest_streak", 0) if user_doc else 0
 
-        # Validate current streak is still active (not broken)
-        if user_doc:
-            last_completion = user_doc.get("last_completion")
-            if last_completion:
-                try:
-                    last_date = datetime.strptime(last_completion, "%m/%d/%Y").date()
-                    today = datetime.now(timezone.utc).date()
-                    if last_date != today and last_date != today - timedelta(days=1):
-                        current_streak = 0
-                except (ValueError, TypeError):
-                    current_streak = 0
+        # A streak only counts if the last completion was today or yesterday (patient-local)
+        if user_doc and not streak_is_current(user_doc.get("last_completion"), x_timezone):
+            current_streak = 0
 
         # Get user's unlocked achievements
         user_achievements = db["user_achievements"]

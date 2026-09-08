@@ -1,0 +1,41 @@
+{
+    "questions": [
+        {
+            "question_number": 1,
+            "type": "choice",
+            "question": "How is your appetite on a scale of one to five?",
+            "choices": ["1 - Very good", "2 - Good", "3 - Normal", "4 - Poor", "5 - Very poor"]
+        },
+        {
+            "question_number": 2,
+            "type": "choice",
+            "question": "What led to your poor appetite? (Choose all that apply)",
+            "choices": ["Nausea and vomiting", "Mouth sores", "Swallowing difficulties", "Taste changes", "Feeling of fullness", "Low mood / Lost interest in taking food and drinks", "Others, please specify"],
+            "prerequisites": [{"question_number": 1, "allowed_answers": ["4 - Poor", "5 - Very poor"]}]
+        },
+        {
+            "question_number": 3,
+            "type": "choice",
+            "question": "How is your general level of fatigue during the past 24 hours?",
+            "choices": ["0 - None", "1 - Very mild", "2 - Mild", "3 - Moderate", "4 - Bad", "5 - Very bad"]
+        },
+        {
+            "question_number": 4,
+            "type": "choice",
+            "question": "How would you describe your nausea today?",
+            "choices": ["0 - None", "1 - Very mild", "2 - Mild", "3 - Moderate", "4 - Bad", "5 - Very bad"]
+        },
+        {
+            "question_number": 5,
+            "type": "choice",
+            "question": "How frequent is your coughing?",
+            "choices": ["None", "1-2 times", "3-4 times", "5-6 times", "6+ times"]
+        },
+        {
+            "question_number": 6,
+            "type": "choice",
+            "question": "How would you rate the quality of your sleep last night?",
+            "choices": ["1 - Very good", "2 - Good", "3 - Normal", "4 - Poor", "5 - Very poor"]
+        }
+    ]
+}

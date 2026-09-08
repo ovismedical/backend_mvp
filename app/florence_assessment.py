@@ -1,231 +1,135 @@
 """
-Florence Assessment Module - Separated assessment/summarization logic
-Handles structured assessment generation independently from conversation flow
+Florence Assessment - turns a conversation into a structured symptom assessment
+via the inference gateway (structured output against a Pydantic schema).
 """
 
+import logging
 import os
-import json
-from typing import List, Dict, Optional, Any
-from datetime import datetime, timezone
-from openai import OpenAI
+from typing import List, Dict, Any
 
+from .inference import InferenceRequest, get_gateway
 from .florence_utils import (
-    ASSESSMENT_FUNCTION_SCHEMA,
-    ASSESSMENT_FUNCTION_SCHEMA_ZH,
+    SymptomAssessmentOutput,
     create_timestamp,
     should_flag_symptoms,
     format_conversation_history_for_ai,
-    handle_ai_response_error
 )
+
+logger = logging.getLogger("ovis.florence")
+
+TREATMENT_STATUS_ZH = {"undergoing_treatment": "正在接受治療", "in_remission": "康復期"}
+
+
+def load_prompt_template(filename: str, fallback: str) -> str:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+        return text or fallback
+    except OSError as e:
+        logger.warning("prompt file %s unavailable (%s); using fallback prompt", filename, e)
+        return fallback
+
+
+def status_label(treatment_status: str, language: str) -> str:
+    if language == "zh-HK":
+        return TREATMENT_STATUS_ZH.get(treatment_status, treatment_status)
+    return treatment_status
 
 
 class FlorenceAssessment:
-    """Handles structured assessment generation from conversation history"""
-    
-    def __init__(self):
-        self.client = None
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
-        self.temperature = 0.8
-        
-    def initialize(self, api_key: str = None):
-        """Initialize OpenAI client for assessment"""
-        try:
-            if api_key:
-                print(f"🔑 Initializing Assessment module with provided API key: {api_key[:10]}...")
-                self.client = OpenAI(
-                    api_key=api_key,
-                    timeout=60.0,  # Increase timeout for VPN
-                    max_retries=3
-                )
-            else:
-                # Try to get from environment
-                api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
-                    print("❌ No OpenAI API key found for assessment")
-                    raise ValueError("OpenAI API key not provided")
-                print(f"🔑 Assessment module using environment API key: {api_key[:10]}...")
-                self.client = OpenAI(
-                    api_key=api_key,
-                    timeout=60.0,  # Increase timeout for VPN
-                    max_retries=3
-                )
-            print("✅ Assessment client initialized successfully")
-            return True
-        except Exception as e:
-            print(f"❌ Failed to initialize Assessment client: {e}")
-            return False
-    
+    def initialize(self, api_key: str = None) -> bool:
+        return get_gateway().available()
+
     def _load_assessment_prompt(self, language: str = "en") -> str:
-        """Load assessment prompt from external file"""
-        try:
-            # Get the directory where this module is located
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            # Select prompt file based on language
-            if language == "zh-HK":
-                prompt_file_path = os.path.join(current_dir, "assessment_prompt_canto.txt")
-                print(f"🔤 Loading Cantonese assessment prompt from {prompt_file_path}")
-            else:
-                prompt_file_path = os.path.join(current_dir, "assessment_prompt_eng.txt")
-                print(f"🔤 Loading English assessment prompt from {prompt_file_path}")
-            
-            with open(prompt_file_path, 'r', encoding='utf-8') as file:
-                prompt_template = file.read().strip()
-                
-            if not prompt_template:
-                raise ValueError("Assessment prompt file is empty")
-                
-            print(f"✅ Successfully loaded assessment prompt from {prompt_file_path}")
-            return prompt_template
-            
-        except FileNotFoundError:
-            print(f"❌ Assessment prompt file not found at {prompt_file_path}")
-            # Fallback prompt
-            return "Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment."
-        except Exception as e:
-            print(f"❌ Error loading assessment prompt file: {e}")
-            # Fallback prompt
-            return "Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment."
-    
+        filename = "assessment_prompt_canto.txt" if language == "zh-HK" else "assessment_prompt_eng.txt"
+        return load_prompt_template(
+            filename,
+            "Based on the conversation above with patient {patient_id} ({treatment_status}), "
+            "generate a comprehensive structured symptom assessment.",
+        )
+
     async def generate_structured_assessment(
-        self, 
-        conversation_history: List[Dict], 
-        patient_id: str, 
-        treatment_status: str = "undergoing_treatment", 
-        session_language: str = "en"
+        self,
+        conversation_history: List[Dict],
+        patient_id: str,
+        treatment_status: str = "undergoing_treatment",
+        session_language: str = "en",
     ) -> Dict[str, Any]:
-        """Generate a structured assessment using OpenAI function calling"""
-        if not self.client:
-            return {"error": "Assessment system not initialized"}
-        
         try:
-            # Use the session language setting to determine report language
-            is_cantonese_report = session_language == "zh-HK"
-            
-            print(f"🔍 Session language: {session_language}, Using Cantonese report: {is_cantonese_report}")
-            
-            # Load assessment prompt template from file
-            prompt_template = self._load_assessment_prompt(session_language)
-            
-            # Format the prompt with dynamic values
-            if is_cantonese_report:
-                # Translate treatment status to Cantonese
-                treatment_status_zh = "正在接受治療" if treatment_status == "undergoing_treatment" else "康復期"
-                assessment_prompt = prompt_template.format(
-                    patient_id=patient_id,
-                    treatment_status=treatment_status_zh
-                )
-            else:
-                assessment_prompt = prompt_template.format(
-                    patient_id=patient_id,
-                    treatment_status=treatment_status
-                )
-            
-            # Format history for AI and add assessment request
-            ai_history = format_conversation_history_for_ai(conversation_history, include_system_prompt=False)
-            ai_history.append({"role": "user", "content": assessment_prompt})
-            
-            print(f"🔍 Making structured assessment API call with function calling...")
-            print(f"📝 Conversation length: {len(conversation_history)} messages")
-            print(f"👤 Patient ID: {patient_id}")
-            print(f"🏥 Treatment status: {treatment_status}")
-            print(f"🗣️ Report language: {'Cantonese' if is_cantonese_report else 'English'}")
-            
-            # Choose the appropriate function schema based on session language
-            function_schema = ASSESSMENT_FUNCTION_SCHEMA_ZH if is_cantonese_report else ASSESSMENT_FUNCTION_SCHEMA
-            
-            # Make API call with function calling
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=ai_history,
-                temperature=self.temperature,
-                functions=[function_schema],
-                function_call={"name": "record_symptom_assessment"},
-                stream=False
+            is_cantonese = session_language == "zh-HK"
+            prompt = self._load_assessment_prompt(session_language).format(
+                patient_id=patient_id, treatment_status=status_label(treatment_status, session_language)
             )
-            
-            # Parse the function call response
-            if completion.choices[0].message.function_call:
-                print("✅ Got function call response from OpenAI")
-                function_args = json.loads(completion.choices[0].message.function_call.arguments)
-                print(f"📊 Function args received: {json.dumps(function_args, indent=2)}")
-                
-                # Add timestamp and patient_id if not provided
-                function_args["timestamp"] = create_timestamp()
-                function_args["patient_id"] = patient_id
-                
-                # Determine oncologist flagging
-                symptoms = function_args.get("symptoms", {})
-                should_flag, notification_level, flag_reason = should_flag_symptoms(symptoms, treatment_status)
-                
-                function_args["flag_for_oncologist"] = should_flag
-                function_args["oncologist_notification_level"] = notification_level
-                if should_flag:
-                    function_args["flag_reason"] = flag_reason
-                
-                print(f"🏁 Final structured assessment created with {len(symptoms)} symptoms")
-                return {
-                    "structured_assessment": function_args,
-                    "conversation_length": len(conversation_history)
-                }
-            else:
-                print("❌ No function call in OpenAI response, using fallback")
-                # Fallback if function calling fails
-                return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
-                
+            messages = format_conversation_history_for_ai(conversation_history, include_system_prompt=False)
+            messages.append({"role": "user", "content": prompt})
+
+            result = await get_gateway().complete(InferenceRequest(
+                task="symptom_assessment",
+                messages=messages,
+                instructions=(
+                    "You are a clinical documentation assistant for an oncology nursing service. "
+                    "Read the conversation between the nurse Florence and the patient and record a "
+                    "structured symptom assessment. Base ratings only on what the patient said; "
+                    "use rating 1 for symptoms that were not reported."
+                    + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else "")
+                ),
+                schema=SymptomAssessmentOutput,
+                language=session_language,
+                effort="low",
+                temperature=0.3,
+                metadata={"patient_ref": patient_id},
+            ))
+
+            assessment = result.parsed.model_dump()
+            assessment["timestamp"] = create_timestamp()
+            assessment["patient_id"] = patient_id
+            assessment["treatment_status"] = treatment_status
+
+            should_flag, level, reason = should_flag_symptoms(assessment["symptoms"], treatment_status)
+            assessment["flag_for_oncologist"] = should_flag
+            assessment["oncologist_notification_level"] = level
+            if should_flag:
+                assessment["flag_reason"] = reason
+
+            return {"structured_assessment": assessment, "conversation_length": len(conversation_history)}
+
         except Exception as e:
-            print(f"❌ Error generating structured assessment: {e}")
-            return await self._generate_fallback_assessment(conversation_history, patient_id, treatment_status)
-    
-    async def _generate_fallback_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str) -> Dict[str, Any]:
-        """Generate a fallback assessment when structured function calling fails"""
-        try:
-            # Create a simple structured assessment based on what we know
-            fallback_assessment = {
+            logger.error("structured assessment failed for patient_ref=%s: %s", patient_id, type(e).__name__)
+            return self._fallback_assessment(conversation_history, patient_id, treatment_status)
+
+    def _fallback_assessment(self, conversation_history: List[Dict], patient_id: str, treatment_status: str) -> Dict[str, Any]:
+        blank = {"frequency_rating": 1, "severity_rating": 1, "key_indicators": [], "additional_notes": None}
+        return {
+            "structured_assessment": {
                 "timestamp": create_timestamp(),
                 "patient_id": patient_id,
-                "symptoms": {
-                    "cough": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "nausea": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "lack_of_appetite": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "fatigue": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []},
-                    "pain": {"frequency_rating": 1, "severity_rating": 1, "key_indicators": []}
-                },
+                "symptoms": {name: dict(blank) for name in ("cough", "nausea", "lack_of_appetite", "fatigue", "pain")},
                 "flag_for_oncologist": False,
+                "flag_reason": None,
                 "oncologist_notification_level": "none",
                 "treatment_status": treatment_status,
-                "mood_assessment": "Assessment completed through conversation with Florence",
-                "conversation_notes": f"Conversation with {len(conversation_history)} messages completed."
-            }
-            
-            return {
-                "structured_assessment": fallback_assessment,
-                "conversation_length": len(conversation_history)
-            }
-            
-        except Exception as e:
-            print(f"Error in fallback assessment: {e}")
-            return {
-                "error": str(e),
-                "structured_assessment": None
-            }
+                "mood_assessment": None,
+                "conversation_notes": f"Automated assessment unavailable; conversation of {len(conversation_history)} messages saved for manual review.",
+            },
+            "conversation_length": len(conversation_history),
+            "fallback": True,
+        }
 
 
-# Global Assessment instance
 florence_assessment = FlorenceAssessment()
 
-# Convenience functions for the API
+
 async def initialize_florence_assessment(api_key: str = None) -> bool:
-    """Initialize Florence Assessment system"""
     return florence_assessment.initialize(api_key)
 
+
 async def get_florence_structured_assessment(
-    conversation_history: List[Dict], 
-    patient_id: str, 
+    conversation_history: List[Dict],
+    patient_id: str,
     treatment_status: str = "undergoing_treatment",
-    session_language: str = "en"
+    session_language: str = "en",
 ) -> Dict[str, Any]:
-    """Generate structured assessment using the separated assessment system"""
     return await florence_assessment.generate_structured_assessment(
         conversation_history, patient_id, treatment_status, session_language
-    ) 
+    )

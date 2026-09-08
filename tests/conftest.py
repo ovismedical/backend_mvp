@@ -47,8 +47,9 @@ class MockCollection:
         result.upserted_id = None
         return result
 
-    def find_one(self, filter_dict=None, projection=None):
-        for doc in self._docs:
+    def find_one(self, filter_dict=None, projection=None, sort=None):
+        docs = self.find(filter_dict, sort=sort) if sort else self._docs
+        for doc in docs:
             if self._matches(doc, filter_dict or {}):
                 result = doc.copy()
                 if projection:
@@ -59,7 +60,7 @@ class MockCollection:
                 return result
         return None
 
-    def find(self, filter_dict=None, projection=None):
+    def find(self, filter_dict=None, projection=None, sort=None):
         results = []
         for doc in self._docs:
             if self._matches(doc, filter_dict or {}):
@@ -69,13 +70,25 @@ class MockCollection:
                         if val == 0 and key in result:
                             del result[key]
                 results.append(result)
-        return results
+        cursor = MockCursor(results)
+        return cursor.sort(sort) if sort else cursor
 
     def update_one(self, filter_dict, update, upsert=False):
         for doc in self._docs:
             if self._matches(doc, filter_dict):
                 if "$set" in update:
                     doc.update(update["$set"])
+                if "$unset" in update:
+                    for k in update["$unset"]:
+                        doc.pop(k, None)
+                if "$addToSet" in update:
+                    for k, v in update["$addToSet"].items():
+                        doc.setdefault(k, [])
+                        if v not in doc[k]:
+                            doc[k].append(v)
+                if "$push" in update:
+                    for k, v in update["$push"].items():
+                        doc.setdefault(k, []).append(v)
                 if "$setOnInsert" in update:
                     pass  # Only applies on insert
                 result = MagicMock()
@@ -102,6 +115,18 @@ class MockCollection:
         result.upserted_id = None
         return result
 
+    def delete_one(self, filter_dict=None):
+        for i, d in enumerate(self._docs):
+            if self._matches(d, filter_dict or {}):
+                del self._docs[i]
+                break
+        return MagicMock(deleted_count=1)
+
+    def insert_many(self, docs):
+        for d in docs:
+            self.insert_one(d)
+        return MagicMock()
+
     def delete_many(self, filter_dict=None):
         before = len(self._docs)
         self._docs = [d for d in self._docs if not self._matches(d, filter_dict or {})]
@@ -118,9 +143,42 @@ class MockCollection:
     @staticmethod
     def _matches(doc, filter_dict):
         for key, val in filter_dict.items():
-            if doc.get(key) != val:
+            if key == "$or":
+                if not any(MockCollection._matches(doc, clause) for clause in val):
+                    return False
+                continue
+            actual = doc.get(key)
+            if isinstance(val, dict) and val and all(str(k).startswith("$") for k in val):
+                for op, operand in val.items():
+                    if op == "$gte" and not (actual is not None and actual >= operand): return False
+                    if op == "$lte" and not (actual is not None and actual <= operand): return False
+                    if op == "$gt" and not (actual is not None and actual > operand): return False
+                    if op == "$lt" and not (actual is not None and actual < operand): return False
+                    if op == "$ne" and actual == operand: return False
+                    if op == "$in" and actual not in operand: return False
+                    if op == "$nin" and actual in operand: return False
+                    if op == "$exists" and (key in doc) != bool(operand): return False
+                continue
+            if actual != val:
                 return False
         return True
+
+
+class MockCursor(list):
+    """List that also supports pymongo cursor chaining: .sort(), .limit()."""
+
+    def sort(self, key_or_list=None, direction=1):
+        if key_or_list is None:
+            return self
+        if isinstance(key_or_list, list):
+            key, direction = key_or_list[0]
+        else:
+            key = key_or_list
+        ordered = sorted(self, key=lambda d: (d.get(key) is None, d.get(key)), reverse=(direction == -1))
+        return MockCursor(ordered)
+
+    def limit(self, n):
+        return MockCursor(self[:n]) if n else self
 
 
 class MockDatabase:
@@ -222,3 +280,14 @@ async def client(app_with_db):
     transport = ASGITransport(app=app_with_db)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+# ---------------------------------------------------------------------------
+# Inference: no provider by default so no test can reach a real API
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _no_inference_provider():
+    from app.inference import InferenceGateway, reset_gateway
+    reset_gateway(InferenceGateway({}))
+    yield
+    reset_gateway(InferenceGateway({}))

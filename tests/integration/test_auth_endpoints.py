@@ -31,19 +31,18 @@ class TestLoginEndpoint:
             "/token",
             data={"username": "testpatient", "password": "wrongpassword"},
         )
-        assert response.status_code == 200  # App returns 200 with details
+        assert response.status_code == 401
         body = response.json()
-        assert "details" in body
-        assert "Invalid" in body["details"]
+        assert "Invalid" in body["detail"]
 
     async def test_login_nonexistent_user(self, client, seeded_db):
         response = await client.post(
             "/token",
             data={"username": "nobody", "password": "whatever"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 401
         body = response.json()
-        assert "details" in body
+        assert "detail" in body
 
 
 class TestUserInfoEndpoint:

@@ -1,21 +1,67 @@
 import asyncio
 
 from .login import get_db, get_user
-from .achievements import check_and_unlock_achievements
+from .achievements import update_daily_streak, patient_now
 from .questionnaire_models import SubmissionInput, DraftInput
 from .questionnaire_enrichment import enrich_submission
+from .questionnaire_definitions import SECTIONS
 from .questionnaire_triage_bridge import generate_questionnaire_triage
-from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Header
+from typing import Optional
+from datetime import datetime, timezone
 
 symptom_router = APIRouter(tags=["symptom_questionnaire"])
+
+
+def _serialize_options(options: dict):
+    return [{"value": value, "label": label} for value, label in options.items()]
+
+
+def _serialize_sections():
+    sections = []
+    for section in SECTIONS:
+        questions = []
+        for q in section["questions"]:
+            item = {
+                "id": q["id"],
+                "type": q["type"],
+                "text": q["text"],
+                "required": q.get("required", False),
+            }
+            for key in ("conditional", "min", "max", "placeholder", "slider_config", "exclusive_options", "alert_values"):
+                if key in q:
+                    item[key] = q[key]
+            if "options" in q:
+                item["options"] = _serialize_options(q["options"])
+            if "regions" in q:
+                item["regions"] = [
+                    {"value": key, "label": label, "side": q.get("region_sides", {}).get(key, "front")}
+                    for key, label in q["regions"].items()
+                ]
+            questions.append(item)
+        sections.append({
+            "id": section["id"],
+            "title": section["title"],
+            "clinical_area": section["clinical_area"],
+            "questions": questions,
+        })
+    return sections
+
+
+QUESTIONNAIRE_DEFINITIONS = _serialize_sections()
+
+
+@symptom_router.get("/symptom-questionnaire/definitions")
+async def get_questionnaire_definitions():
+    return {"sections": QUESTIONNAIRE_DEFINITIONS, "total_sections": len(QUESTIONNAIRE_DEFINITIONS)}
 
 
 @symptom_router.post("/symptom-questionnaire/submit")
 async def submit_symptom_questionnaire(
     submission: SubmissionInput,
     user = Depends(get_user),
-    db = Depends(get_db)
+    db = Depends(get_db),
+    x_timezone: Optional[str] = Header(default=None, alias="X-Timezone"),
 ):
     """Submit completed symptom questionnaire with structured enrichment."""
     try:
@@ -34,7 +80,8 @@ async def submit_symptom_questionnaire(
         now = datetime.now(timezone.utc)
         enriched["user_id"] = user["username"]
         enriched["submitted_at"] = now
-        enriched["date"] = now.strftime("%Y-%m-%d")
+        enriched["date"] = patient_now(x_timezone).strftime("%Y-%m-%d")  # patient-local calendar day
+        enriched["timezone"] = x_timezone
         enriched["timestamp"] = now.isoformat()
 
         # Backward compat: keep top-level fields the dashboard reads
@@ -56,51 +103,13 @@ async def submit_symptom_questionnaire(
             )
         )
 
-        # Update user's streak and last completion date
-        users = db["users"]
-        today = now.strftime("%Y-%m-%d")
-
-        user_doc = users.find_one({"username": user["username"]})
-        if user_doc:
-            current_streak = user_doc.get("questionnaire_streak", 0)
-            last_completion = user_doc.get("last_questionnaire_completion")
-
-            if last_completion == today:
-                return {
-                    "message": "Symptom questionnaire submitted successfully",
-                    "questionnaire_id": str(result.inserted_id),
-                    "streak": current_streak,
-                    "triage_status": "generating"
-                }
-
-            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-            if last_completion == yesterday:
-                new_streak = current_streak + 1
-            else:
-                new_streak = 1
-
-            users.update_one(
-                {"username": user["username"]},
-                {"$set": {
-                    "questionnaire_streak": new_streak,
-                    "last_questionnaire_completion": today
-                }}
-            )
-
-            overall_longest = max(user_doc.get("longest_streak", 0), new_streak)
-            newly_unlocked = check_and_unlock_achievements(db, user["username"], overall_longest)
-
-            return {
-                "message": "Symptom questionnaire submitted successfully",
-                "questionnaire_id": str(result.inserted_id),
-                "streak": new_streak,
-                "newly_unlocked": newly_unlocked,
-                "triage_status": "generating"
-            }
+        streak, newly_unlocked = update_daily_streak(db, user["username"], x_timezone)
 
         return {
             "message": "Symptom questionnaire submitted successfully",
             "questionnaire_id": str(result.inserted_id),
+            "streak": streak,
+            "newly_unlocked": newly_unlocked,
             "triage_status": "generating"
         }
 

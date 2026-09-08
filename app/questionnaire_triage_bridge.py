@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from .login import get_db
+from .inference import get_gateway
 from .florence_assessment import (
     initialize_florence_assessment,
     get_florence_structured_assessment,
@@ -129,10 +130,13 @@ async def generate_questionnaire_triage(
             print(f"⏭️ Triage already exists for questionnaire {questionnaire_id}")
             return
 
-        # Initialize AI modules
-        api_key = os.getenv("OPENAI_API_KEY")
-        await initialize_florence_assessment(api_key)
-        await initialize_florence_triage(api_key)
+        if not get_gateway().available():
+            print(f"⏭️ Skipping triage for questionnaire {questionnaire_id}: no inference provider configured")
+            db["symptom_questionnaires"].update_one(
+                {"_id": __import__("bson").ObjectId(questionnaire_id)},
+                {"$set": {"triage_status": "skipped"}},
+            )
+            return
 
         # Run triage + structured assessment in parallel
         print(f"🚀 Generating triage for questionnaire {questionnaire_id}...")
@@ -162,7 +166,7 @@ async def generate_questionnaire_triage(
         session_data = {
             "session_id": f"questionnaire_{questionnaire_id}",
             "user_id": user["username"],
-            "user_info": user,
+            "user_info": {"username": user["username"], "full_name": user.get("full_name")},
             "language": language,
             "input_mode": "questionnaire",
             "conversation_history": conversation_history,
