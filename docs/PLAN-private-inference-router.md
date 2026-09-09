@@ -1,6 +1,6 @@
 # Plan: PHI-safe inference for Florence (scrub → gate → Azure → audit)
 
-**Revision 3 — 2026-09-09.** Supersedes rev 2 (same day). Changes: Hong Kong's PDPO is the
+**Revision 3 — 2026-09-09** (amended same day: scrubber scope now explicitly covers PII the patient volunteers in chat and indirect identifiers that combine to identify). Supersedes rev 2. Changes: Hong Kong's PDPO is the
 governing law, not HIPAA; the self-hosted model is **parked** with explicit unpark triggers; the
 scrubber stays on the critical path; clinician agree/override capture is added because it is the one
 debt that compounds while the local route is parked; residency work targets storage and the API,
@@ -85,21 +85,60 @@ Add `pii_detect` as a task and `patient_ref` (opaque id) in `metadata`; the user
 appearing in metadata, logs and records.
 
 ### 2.2 Scrubber (`app/inference/scrub.py`)
+Runs on **every message in both directions**, including anything the patient volunteers in free
+text. The identifiers we hold in the profile are the easy part. The hard part is what people say:
+"my daughter Mei Ling took me to Queen Mary on Tuesday", "I live in Tai Koo Shing", "Dr Chan at the
+Sanatorium said…", "I'm 59 and I teach at a school in Sha Tin". Each piece is harmless alone and
+identifying together (the mosaic effect). So the scrubber targets direct identifiers **and** the
+enumerable indirect ones, and it **generalises rather than deletes** so the clinical meaning survives.
+
 Layered; if any layer errors the request is **refused**, not forwarded.
 1. **Known-identifier pass** — exact/fuzzy replace of values we hold for the session: `full_name`,
    `username`, `email`, `dob`, doctor name, hospital. Also **stop seeding the name**: the opening
    turn becomes "I'm here for my health check-in" and the greeting is personalised after the reply
-   via the `[PATIENT]` token.
-2. **Deterministic patterns** — HKID `A123456(7)`, phones (+852 / 8-digit), email, dates, addresses,
-   URLs, MRN-like ids, card numbers. Safe Harbor's 18 identifiers as the checklist.
-3. **NER** — Presidio with spaCy `en_core_web_lg` + `zh_core_web_lg`; custom recogniser for Chinese
-   surnames + honorifics.
-4. **Model pass — conditional.** Only if Traditional Chinese recall on the eval set misses the bar
-   in Phase 1. If needed, a 4B model on CPU (Gemma 4 E4B) is enough for short chat turns; it does
-   not require the parked GPU route.
-5. **Reversible token map** — `[PATIENT]`, `[DATE_1]`, `[PHONE_1]` … stored in the session record,
-   never sent to a provider; outputs re-identified before reaching the patient.
-6. **Scrub report** — counts per category → audit event + test assertions.
+   via the `[PERSON_1]` token.
+2. **Deterministic patterns** — HKID `A123456(7)`, passport / Home Return Permit numbers, phones
+   (+852 / 8-digit), email, addresses (Flat/Floor/Block/Estate and 室/樓/座/邨/苑), URLs and handles
+   (WhatsApp, Instagram, WeChat), MRN-like ids, insurance policy numbers, card numbers, plates.
+3. **Hong Kong gazetteers** — Hospital Authority and private hospitals and clinics, the 18
+   districts, major housing estates, MTR stations, in English and Chinese. Deterministic and
+   high-recall for the places people actually mention.
+4. **NER** — Presidio with spaCy `en_core_web_lg` + `zh_core_web_lg`, **plus** a small multilingual
+   PII token classifier (GLiNER-class, runs on CPU in tens of milliseconds) evaluated against the
+   same set; whichever wins on Traditional Chinese recall ships. Kinship rule: a name that follows
+   我個女 / 我老公 / my daughter / my husband is a person.
+5. **Model pass — conditional.** Only if recall still misses the bar. If needed, scope it to the
+   background triage payload first, which is latency-insensitive; a 4B model on CPU covers it.
+6. **Generalisation table** — the part that defends against piecing together:
+
+   | Found | Becomes | Why |
+   |---|---|---|
+   | person (patient, relative, clinician) | `[PERSON_1]`, `[PERSON_2]` … consistent per session | the model keeps the thread |
+   | hospital / clinic | `[FACILITY_1]` | |
+   | district / estate / street / station | `[PLACE_1]` | |
+   | employer / school / insurer | `[ORG_1]` | |
+   | occupation | `[OCCUPATION]` | rarely clinically relevant here |
+   | absolute date | `[DATE_1 · 3 days ago]` | the model needs timing, not the date |
+   | stated age | decade band; 90+ collapsed | Safe Harbor rule |
+   | id numbers, phones, emails, handles | `[ID]`, `[PHONE]`, `[EMAIL]`, `[HANDLE]` | |
+
+   Symptom words, medication names, severities and durations are never touched. The eval measures
+   **over-scrubbing** as well as recall ("Queen Mary" in a hospital name vs "Mary" the patient's
+   friend; 陳皮 and 李子 are not surnames).
+7. **Reversible token map** — stored in the session record, never sent to a provider. Outputs are
+   re-identified before reaching the patient; clinician views are re-identified too, since the care
+   team is entitled to the real text.
+8. **Scrub report** — counts per category, plus a *linkage score*: how many distinct indirect
+   categories appeared in one payload. An audit metric for now, not a gate.
+
+**Prompt and UI side, cheap and effective**
+- Florence's system prompt: never ask for names, addresses, ID numbers or exact dates; if the
+  patient offers them, do not repeat them; refer to people by relationship.
+- Chat surface hint: "You don't need to share names, addresses or ID numbers with Florence."
+
+**Honest limit.** Narrative can still identify someone: a rare diagnosis plus a life event plus a
+treatment timeline. Scrubbing is data minimisation, not anonymisation. The processor contract in §4
+is the backstop, which is why the gate refuses when `dpa_ok` is false even with a perfect scrub.
 
 ### 2.3 Gate + policy (`app/inference/router.py` + `routing_policy.yaml`)
 Inputs: task, `scrubber_ok`, `compliance.dpa_ok` (Microsoft DPA accepted for the subscription and
@@ -177,8 +216,12 @@ evaluation had Gemma 4 31B well ahead on triage and reasoning). Revisit if a Gem
 model ships.
 
 ## 6. Evaluation
-- `tests/eval/phi_recall/`: 200 synthetic EN + ZH-HK transcripts with seeded identifiers; ≥99%
-  recall per category before the Azure route is enabled in CI; zh recall reported separately.
+- `tests/eval/phi_recall/`: 200 synthetic EN + ZH-HK transcripts. Identifiers are seeded in
+  **patient turns as volunteered free text**, not just in the profile: relatives' names after
+  kinship terms, hospitals, districts and estates, employers, exact dates, stated ages, HKIDs,
+  phones, handles, and combinations of three or more indirect identifiers in one session. Report
+  recall per category, zh separately, **and over-redaction** (clinical terms wrongly removed).
+  ≥99% recall on direct identifiers and ≥95% on indirect ones before the Azure route is enabled in CI.
 - Gate tests: every (scrubber_ok, dpa_ok, health) combination → expected behaviour, including the
   refusal UX.
 - Triage agreement: clinician labels from `assessment_reviews` vs Florence; disagreement rate by
@@ -190,14 +233,14 @@ model ships.
 
 | Phase | Scope | Effort | Exit criteria |
 |---|---|---|---|
-| **1. Scrubber + minimum necessary** | `scrub.py`; stop seeding the name; token map + re-identify; `patient_ref` replaces username in metadata and records; stop copying `user_info` into assessments; PHI recall eval EN + ZH | 2 days | ≥99% recall; Azure sees no name in any transcript; tests green |
+| **1. Scrubber + minimum necessary** | `scrub.py` with all eight layers incl. HK gazetteers and the generalisation table; stop seeding the name; token map + re-identify (patient and clinician views); `patient_ref` replaces username in metadata and records; stop copying `user_info` into assessments; Florence prompt + chat hint; PHI recall + over-redaction eval EN + ZH | 3 days | ≥99% direct / ≥95% indirect recall; Azure sees no name, place, date or facility in any transcript; tests green |
 | **2. Gate + audit** | `routing_policy.yaml`; `dpa_ok`/`scrubber_ok` gate; delete fall-back-to-anything; refusal UX; `audit_events` | 1 day | Gate tests green; every call has an audit doc with decision + reason |
 | **3. Clinician feedback + evals** | Agree/override endpoint + UI; triage-agreement report; confidence gating | 1.5 days | Every ORANGE/RED can be reviewed in one tap; disagreement report runs |
 | **4. Contracts + residency** | Portal check of region/SKU; Modified Abuse Monitoring application; Atlas to Hong Kong region; Render-vs-Container-Apps decision; DPP1 notice + privacy policy; processor register; breach runbook | 2–3 days + lead time | Notice live; processors documented; storage in Hong Kong |
 | **5. Hardening** | httpOnly cookie auth; CSFLE; retention policy; export endpoint; red-team suite | 2–3 days | `docs/compliance/` complete |
 | **🅿 Self-hosted route** | Ollama dev recipe now; vLLM/Foundry prod only on an unpark trigger | ½ day now; 1–2 days when triggered | Runbook works; (later) Florence runs with `OPENAI_API_KEY` unset |
 
-Phases 1–3 make the headline claim true except "stored in Hong Kong", which is Phase 4.
+Phases 1–3 (about 5.5 days) make the headline claim true except "stored in Hong Kong", which is Phase 4.
 
 ## 8. Decisions
 
@@ -205,7 +248,7 @@ Taken in this revision
 1. Vendor = Azure OpenAI (Foundry), `gpt-5.6-sol`. OpenAI direct is unusable from Hong Kong.
 2. Governing framework = PDPO; HIPAA kept as the technical checklist only.
 3. Self-hosted route parked with the triggers in §5; Gemma 4 when unparked.
-4. Scrubber stays on the critical path; model pass for Chinese only if recall demands it.
+4. Scrubber stays on the critical path and covers **volunteered and indirect identifiers**, not just profile fields; model pass only if recall demands it.
 5. Clinician agree/override capture added now.
 
 Need your call
