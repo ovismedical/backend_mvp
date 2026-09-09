@@ -49,7 +49,12 @@ def sample_triage(alert_level="GREEN", treatment_status="undergoing_treatment") 
 
 
 class FakeProvider:
-    """Records every request it receives and answers from canned data."""
+    """Records every request it receives and answers from canned data.
+
+    `chat_reply` may be a string (always the same reply), a list of strings (consumed in order, the
+    last one repeats) or a callable `(request) -> str`, so a test can script what the model says turn
+    by turn - e.g. a reply that echoes a placeholder such as "How kind of [PERSON_2]!".
+    """
 
     def __init__(self, name="fake", model="fake-model", chat_reply="Hello! How are you feeling?",
                  alert_level="GREEN", fail=False):
@@ -59,13 +64,27 @@ class FakeProvider:
         self.alert_level = alert_level
         self.fail = fail
         self.requests = []
+        self._chat_calls = 0
+
+    def _next_chat_reply(self, request):
+        reply = self.chat_reply
+        if callable(reply):
+            return reply(request)
+        if isinstance(reply, (list, tuple)):
+            if not reply:
+                return ""
+            index = min(self._chat_calls, len(reply) - 1)
+            return reply[index]
+        return reply
 
     async def chat(self, request, model=None):
         self.requests.append(request)
         self.models = getattr(self, "models", []) + [model or self.model]
         if self.fail:
             raise RuntimeError("provider down")
-        return self.chat_reply
+        reply = self._next_chat_reply(request)
+        self._chat_calls += 1
+        return reply
 
     async def parse(self, request, model=None):
         self.requests.append(request)
@@ -82,12 +101,25 @@ class FakeProvider:
         return not self.fail
 
 
+def all_message_text(requests) -> str:
+    """Every outbound message content (plus instructions) of the recorded requests, joined - for
+    "this identifier never reached the provider" assertions."""
+    parts = []
+    for request in requests:
+        for message in request.messages:
+            content = message.get("content") if isinstance(message, dict) else message
+            parts.append(content if isinstance(content, str) else str(content))
+        if request.instructions:
+            parts.append(request.instructions)
+    return "\n".join(parts)
+
+
 def permissive_policy(provider_names, tasks=TASKS) -> Policy:
     """Test policy: every given provider has no requirements and every task routes to the first one.
 
-    `on_refuse` is copied from the real YAML so call sites see the same refusal semantics. Used until
-    every call site marks its requests `scrubbed=True`; pass `policy=Policy.load()` to exercise the
-    real policy (openai requires dpa_ok + scrubbed).
+    `on_refuse` is copied from the real YAML so call sites see the same refusal semantics. Opt in with
+    `fake_gateway(policy=permissive_policy([...]), ...)` when a test needs a provider the YAML does not
+    route to; the default `fake_gateway()` enforces the real policy.
     """
     provider_names = list(provider_names)
     if not provider_names:
@@ -105,15 +137,13 @@ def permissive_policy(provider_names, tasks=TASKS) -> Policy:
 def fake_gateway(policy=None, audit_sink=None, **providers) -> InferenceGateway:
     """Gateway backed by the given providers, e.g. fake_gateway(openai=FakeProvider()).
 
-    policy=None installs `permissive_policy` (every task -> the first provider, no flag or scrub
-    requirements). With an explicit policy (e.g. `Policy.load()`), routing and requirements follow
-    that policy alone: constructor routes are empty so env overrides cannot interfere.
+    policy=None enforces the real YAML policy (`Policy.load()`: openai requires dpa_ok + scrubbed), so the
+    integration suite proves every call site scrubs and the conftest COMPLIANCE_DPA_OK=true flag is what
+    lets calls through; refusal tests `delenv` it. Constructor routes are empty so env overrides cannot
+    interfere and routing follows the policy alone. Pass `permissive_policy([...])` to bypass the YAML.
     """
     if not providers:
         providers = {"openai": FakeProvider(name="openai")}
     if policy is None:
-        policy = permissive_policy(providers)
-        routes = {task: next(iter(providers)) for task in TASKS}
-    else:
-        routes = {}
-    return InferenceGateway(providers, routes, router=Router(policy), audit_sink=audit_sink)
+        policy = Policy.load()
+    return InferenceGateway(providers, {}, router=Router(policy), audit_sink=audit_sink)

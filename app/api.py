@@ -24,6 +24,7 @@ logging.getLogger("uvicorn.access").disabled = True
 
 from .login import get_db, get_client, get_user  # noqa: E402
 from .inference import get_gateway  # noqa: E402
+from .inference.audit import MongoAuditSink, ensure_audit_indexes  # noqa: E402
 from .florence import ensure_session_index  # noqa: E402
 from .doctor import ensure_review_indexes  # noqa: E402
 
@@ -37,6 +38,12 @@ def cors_origins() -> list[str]:
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
+def configure_gateway_audit(db) -> None:
+    """Point the (lazy) gateway's audit trail at Mongo. The sink swallows its own errors, so an
+    unreachable database degrades to the content-free log line rather than failing a call."""
+    get_gateway().audit_sink = MongoAuditSink(db)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     gateway = get_gateway()
@@ -44,11 +51,15 @@ async def lifespan(app: FastAPI):
         logger.info("inference ready: %s", gateway.describe())
     else:
         logger.warning("no inference provider configured - Florence runs in fallback mode")
+    gateway.log_policy_state()  # e.g. "inference policy dpa_ok=false: openai-routed tasks will refuse"
     try:
-        ensure_session_index(get_db())
-        ensure_review_indexes(get_db())
+        db = get_db()
+        ensure_session_index(db)
+        ensure_review_indexes(db)
+        ensure_audit_indexes(db)
+        configure_gateway_audit(db)
     except Exception as e:
-        logger.warning("could not prepare session indexes: %s", type(e).__name__)
+        logger.warning("could not prepare database indexes or the audit sink: %s", type(e).__name__)
     yield
 
 
@@ -127,4 +138,5 @@ async def configure_db(user=Depends(get_user), db=Depends(get_db)):
     db["temp_users"].create_index("created_at", expireAfterSeconds=600)
     ensure_session_index(db)
     ensure_review_indexes(db)
+    ensure_audit_indexes(db)
     return {"message": "Database indexes configured successfully"}

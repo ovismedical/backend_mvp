@@ -27,10 +27,13 @@ cp .env.example .env
 
 ```bash
 source venv/bin/activate
-python -m uvicorn app.api:app --reload --port 8000
+python -m uvicorn app.api:app --reload --port 8000 --no-access-log
 ```
 
 API docs available at http://localhost:8000/docs
+
+`--no-access-log` keeps request paths (which carry usernames in session ids and `/doctor/patient/{username}`)
+out of stdout; `app/api.py` also disables the `uvicorn.access` logger for bare `uvicorn` runs.
 
 ## Local demo (no Atlas, no OpenAI key required)
 
@@ -38,7 +41,7 @@ API docs available at http://localhost:8000/docs
 docker run -d --name ovis-mongo -p 27017:27017 mongo:7
 # .env: MONGODB_URI=mongodb://localhost:27017, SECRET_KEY=<random>, OPENAI_API_KEY=<optional>
 python scripts/seed_demo.py          # hospital + doctor + 2 patients with 6 weeks of history
-python -m uvicorn app.api:app --reload --port 8000
+python -m uvicorn app.api:app --reload --port 8000 --no-access-log
 ```
 
 Demo accounts (password `demo1234` for all): patient `alex`, patient `jordan`, clinician `drlee`.
@@ -52,6 +55,11 @@ With a key but without `COMPLIANCE_DPA_OK=true`, the routing policy (`app/infere
 refuses every call to the `openai` provider: chat gets a scripted reply and finished check-ins are saved
 as `pending_clinician_review` for the care team. `GET /health` shows `florence_ai: "refusing"` in that state.
 Every model call is recorded, content-free, in the `audit_events` collection.
+
+Before anything reaches a provider it is de-identified (`app/inference/scrub`): the patient becomes
+`[PERSON_1]`, other people, places, facilities, dates, ages and numbers become bracketed placeholders, and
+replies are re-identified from a per-session token map before they are stored or shown. Logs and audit
+documents carry only `patient_ref` / `session_ref` (HMACs keyed by `SECRET_KEY`), never names or usernames.
 
 Run the tests with `pytest` (no database needed).
 
@@ -93,7 +101,8 @@ See [.env.example](.env.example) for all required variables:
 - `COMPLIANCE_DPA_OK` - `true` only once the Microsoft DPA covers the Azure subscription; while unset the routing policy refuses every `openai`-routed call (scripted chat fallback, assessments saved as `pending_clinician_review`, `/health` shows `florence_ai: refusing`)
 - `INFERENCE_POLICY_PATH` - optional alternative to `app/inference/routing_policy.yaml` (which task runs on which provider, and what each provider requires)
 - `INFERENCE_ROUTE_CHAT` / `INFERENCE_ROUTE_ASSESSMENT` / `INFERENCE_ROUTE_TRIAGE` - optional per-task provider override (`openai` or `local`); unset = the policy file's provider
-- `SCRUB_NER_BACKEND` - optional NER layer for the PHI scrubber: `none` (default), `presidio`, `gliner`
+- `SCRUB_NER_BACKEND` - optional NER layer for the PHI scrubber: `none` (default), `presidio`, `gliner`; a configured but unavailable backend fails closed (chat refused, check-ins saved for clinician review)
+- `SECRET_KEY` also keys the opaque `patient_ref` / `session_ref` written to logs and `audit_events`; rotating it breaks the join between old audit rows and patients
 - `SENDGRID_API_KEY` - SendGrid for email
 - `CALENDAR_ENCRYPTION_KEY` - Calendar data encryption
 

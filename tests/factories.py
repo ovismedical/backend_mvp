@@ -9,6 +9,13 @@ from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def patient_ref_for(username="testpatient"):
+    """The opaque patient_ref records carry (HMAC of the username under the test SECRET_KEY)."""
+    from app.inference.refs import patient_ref
+
+    return patient_ref(username)
+
+
 def make_user(overrides=None):
     """Create a test patient user dict (as stored in MongoDB 'users' collection)."""
     user = {
@@ -57,7 +64,7 @@ def make_florence_session(overrides=None):
     session = {
         "session_id": "testpatient_1710000000",
         "user_id": "testpatient",
-        "user_info": {"username": "testpatient", "full_name": "Test Patient"},
+        "patient_ref": patient_ref_for(),
         "language": "en",
         "input_mode": "keyboard",
         "treatment_status": "undergoing_treatment",
@@ -114,7 +121,7 @@ def make_assessment_record(overrides=None):
     record = {
         "session_id": "testpatient_1710000000",
         "user_id": "testpatient",
-        "user_info": {"username": "testpatient", "full_name": "Test Patient"},
+        "patient_ref": patient_ref_for(),
         "language": "en",
         "input_mode": "keyboard",
         "conversation_history": [
