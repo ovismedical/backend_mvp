@@ -5,6 +5,8 @@ Florence endpoints run their real code paths with canned model output.
 
 from app.florence_utils import SymptomAssessmentOutput, TriageAssessmentOutput
 from app.inference import InferenceGateway
+from app.inference.gateway import TASKS
+from app.inference.router import Policy, Router
 
 
 def sample_assessment(treatment_status="undergoing_treatment", symptoms=None) -> SymptomAssessmentOutput:
@@ -80,9 +82,38 @@ class FakeProvider:
         return not self.fail
 
 
-def fake_gateway(**providers) -> InferenceGateway:
-    """Gateway whose every task routes to the given providers, e.g. fake_gateway(openai=FakeProvider())."""
+def permissive_policy(provider_names, tasks=TASKS) -> Policy:
+    """Test policy: every given provider has no requirements and every task routes to the first one.
+
+    `on_refuse` is copied from the real YAML so call sites see the same refusal semantics. Used until
+    every call site marks its requests `scrubbed=True`; pass `policy=Policy.load()` to exercise the
+    real policy (openai requires dpa_ok + scrubbed).
+    """
+    provider_names = list(provider_names)
+    if not provider_names:
+        raise ValueError("permissive_policy needs at least one provider name")
+    real = Policy.load()
+    first = provider_names[0]
+    return Policy.from_dict({
+        "version": 1,
+        "flags": {},
+        "providers": {name: {"requires": []} for name in provider_names},
+        "tasks": {task: {"provider": first, "on_refuse": real.on_refuse_for(task) or "skip"} for task in tasks},
+    }, source="tests.mock_openai.permissive_policy")
+
+
+def fake_gateway(policy=None, audit_sink=None, **providers) -> InferenceGateway:
+    """Gateway backed by the given providers, e.g. fake_gateway(openai=FakeProvider()).
+
+    policy=None installs `permissive_policy` (every task -> the first provider, no flag or scrub
+    requirements). With an explicit policy (e.g. `Policy.load()`), routing and requirements follow
+    that policy alone: constructor routes are empty so env overrides cannot interfere.
+    """
     if not providers:
         providers = {"openai": FakeProvider(name="openai")}
-    routes = {task: next(iter(providers)) for task in ("chat_turn", "symptom_assessment", "triage")}
-    return InferenceGateway(providers, routes)
+    if policy is None:
+        policy = permissive_policy(providers)
+        routes = {task: next(iter(providers)) for task in TASKS}
+    else:
+        routes = {}
+    return InferenceGateway(providers, routes, router=Router(policy), audit_sink=audit_sink)

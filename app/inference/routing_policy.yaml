@@ -1,0 +1,29 @@
+# Inference routing policy - reviewed by compliance; data, not code.
+#
+# The gateway consults this file on every model call (app/inference/router.py).
+# A task may only run on a provider when every entry in that provider's `requires`
+# list holds at the moment of the call:
+#   - a flag name (declared under `flags`) is read from its environment variable
+#     at decision time and is true only for "1", "true" or "yes";
+#   - `scrubbed` is satisfied only when the call site marked the request as
+#     de-identified (InferenceRequest.scrubbed=True).
+# Anything else is a refusal (InferenceRefused); the call site maps `on_refuse`
+# to user-visible behaviour. Changing this file changes what leaves the building.
+version: 1
+
+flags:
+  dpa_ok:
+    env: COMPLIANCE_DPA_OK
+    description: >-
+      Microsoft DPA covers the Azure subscription and abuse-monitoring status is
+      recorded in docs/compliance/processors.md
+
+providers:
+  openai: { requires: [dpa_ok, scrubbed] }
+  local:  { requires: [] }
+
+tasks:
+  chat_turn:          { provider: openai, on_refuse: scripted_fallback }
+  symptom_assessment: { provider: openai, on_refuse: pending_clinician_review }
+  triage:             { provider: openai, on_refuse: pending_clinician_review }
+  pii_detect:         { provider: local,  on_refuse: skip }
