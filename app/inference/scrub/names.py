@@ -399,8 +399,12 @@ def _build_kinship_re() -> re.Pattern:
 # Ambiguous surnames are excluded from the cue-gated ZH kinship rule (高興, 容易,
 # 關心, 方便, 常常, 白天 must survive "我個女高興"); the known layer still uses them.
 _AMBIGUOUS_SURNAMES = set("高容關方常白文孫戴賴簡湯任莫尤程易包江游溫夏石章田金康黑史萬紀邊申伊辛尚卜祝單談俞巫鄔邵郁董錢陸侯顧毛倪賀練熊殷龍鄒凌勞符喬阮薛嚴歐")
-_ZH_NAME_TAIL = (r"(?=$|[，。、！？,.!?\s]|話|講|說|同|陪|帶|送|叫|係|是|去|返|都|今|昨|琴|會|喺|在|幫|煮|買|佢|嘅|的|呀|啦|喎|"
-                 r"囉|添|又|成日|日日|經常|好|唔|冇|有|仲|就|先|已經|剛|剩|仍|會)")
+# What may follow a given name after a kinship word: punctuation, or the verb/
+# adverb that starts the predicate (我個女美玲揸車送我 / 我新抱婉婷嚟探我 / 我老公志強打電話).
+_ZH_NAME_TAIL = (r"(?=$|[，。、！？,.!?\s]|話|講|說|同|陪|帶|送|叫|係|是|去|返|都|今|昨|琴|會|喺|在|幫|煮|煲|買|佢|嘅|的|呀|啦|喎|"
+                 r"囉|添|又|成日|日日|經常|好|唔|冇|有|仲|就|先|已經|剛|剩|仍|嚟|來|揸|打|開|見|睇|聽|問|教|畀|請|約|接|載|推|扶|"
+                 r"攞|拎|搵|照顧|擔心|想|要|肯|識|知|記|每|最|成|同我|陪我|帶我|幫我|住|瞓|食|飲|行|坐|企|返工|放工|病|攰|忙|"
+                 r"哭|笑|驚|怕|嘈|鬧|罵|讚|催|逼|迫|勸|提|允|答|應|肯|願|敢|話我|叫我|同我)")
 
 
 # Two-character words that often follow a kinship word and are never a name.
@@ -424,7 +428,19 @@ _ZH_GIVEN_STOP = frozenset({
     "陸續", "顧問", "毛病", "賀年", "練習", "熊貓", "殷勤", "龍蝦", "凌晨", "勞累", "符合", "嚴重", "歐洲", "好返", "返嚟",
     "身體", "健康", "精神", "情況", "情緒", "心情", "胃口", "食慾", "體重", "血壓", "病情", "痛楚", "頭痛", "肚痛", "發燒",
     "咳嗽", "作嘔", "嘔吐", "疲倦", "攰到", "冇力", "無力", "不適", "唔舒", "好返", "差咗", "好咗", "轉差", "轉好",
+    # nouns and verb phrases that routinely follow a kinship word (我個女電話係… / 姑娘問起…)
+    "電話", "手機", "手提", "地址", "電郵", "號碼", "生日", "年紀", "歲數", "身份", "屋企", "公司", "學校", "醫院", "診所",
+    "問起", "講起", "提起", "話起", "聽講", "話過", "講過", "見過", "問過", "嚟過", "去過", "返過", "做過", "食過", "睇過", "試過",
+    "揸車", "開車", "搭車", "坐車", "行路", "跑步", "打機", "煲湯", "煲水", "買菜", "買藥", "拎藥", "攞藥", "配藥", "照肺",
+    "探熱", "量度", "接我", "載我", "推我", "扶我", "教我", "請我", "約我", "搵我", "聽我", "打俾", "打電", "打去", "打嚟",
+    "嚟到", "嚟睇", "嚟陪", "返到", "去到", "入到", "出到", "住喺", "住在", "喺度", "在家", "先生", "太太", "小姐", "女士",
+    "醫生", "姑娘", "護士", "老師", "同學", "同事", "朋友", "鄰居", "細路", "小朋友", "大人", "老人", "長者", "病人",
+    "家裡", "家人", "家中", "家庭", "家務", "家長", "家居", "家下", "家姐", "家嫂", "家婆", "家公", "家翁", "家鄉",
+    "可以", "可能", "可唔", "可惜", "可怕", "可愛", "可靠", "可否",
 })
+
+
+_NAME_INITIALS = frozenset("家可")
 
 
 def _build_kinship_zh_re() -> re.Pattern:
@@ -432,12 +448,14 @@ def _build_kinship_zh_re() -> re.Pattern:
     k = _alt(cjk)
     surnames = "".join(sorted(single_surnames_zh() - _AMBIGUOUS_SURNAMES))
     compound = _alt(compound_surnames_zh())
-    stop = re.escape("".join(sorted(ch for ch in ZH_STOP if has_cjk(ch))))
+    # 家 and 可 are function words for the leftward walk but the commonest given-name
+    # initials in Hong Kong (家俊, 家豪, 可欣); the two-character stoplist covers 家裡/可以.
+    stop = re.escape("".join(sorted(ch for ch in ZH_STOP - _NAME_INITIALS if has_cjk(ch))))
     return re.compile(
         rf"(?:{k})(?:叫|叫做|名叫|係|是)?\s*"
         rf"((?:阿|小)[一-鿿](?![一-鿿])"
         rf"|(?:{compound}|[{surnames}])[一-鿿]{{1,2}}{_ZH_NAME_TAIL}"
-        rf"|(?![{stop}])[一-鿿]{{2}}{_ZH_NAME_TAIL}"
+        rf"|(?![{stop}])(?![一-鿿][得咗緊埋晒])[一-鿿]{{2}}{_ZH_NAME_TAIL}"   # 瞓得/食咗 are verb + particle
         rf"|{_NAME_WORD}(?:\s{_NAME_WORD})?)"
     )
 
@@ -466,6 +484,8 @@ class NameRules:
         self.kinship_zh_re = _build_kinship_zh_re()
         self.occupation_en_re, self.occupation_zh_re = _build_occupation_re()
         self._ah_stop = kinship_zh_with_ah()
+        latin_kin, _ = split_scripts(kinship_words())
+        self._kin_titles = frozenset(k.lower() for k in latin_kin)
 
     def spans(self, text: str, known: KnownMatcher | None = None) -> list[Span]:
         out: list[Span] = []
@@ -478,7 +498,13 @@ class NameRules:
                 out.append(Span(start, end, PERSON, PRIORITY_NAMES, LAYER_NAMES))
 
         for m in self.title_re.finditer(text):
-            person(m.start(), m.end(), m.group(1))
+            title = text[m.start():m.start(1)].strip().rstrip(".").lower()
+            if text[m.start()].islower() and title in self._kin_titles:
+                # "my sister Mei Ling" is a relative, not Sister (the nurse): the name alone
+                # is the span, so later bare mentions of "Mei Ling" are recognised.
+                person(m.start(1), m.end(1), m.group(1))
+            else:
+                person(m.start(), m.end(), m.group(1))
         for m in self.kinship_re.finditer(text):
             person(m.start(1), m.end(1), m.group(1))
         for m in self.occupation_en_re.finditer(text):

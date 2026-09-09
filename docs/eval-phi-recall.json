@@ -1,0 +1,3226 @@
+{
+ "generated_at": "2026-09-09T23:38:25.119257+00:00",
+ "commit": "58136dba",
+ "seed": 20260909,
+ "overlap": 0.8,
+ "corpus": {
+  "total": 200,
+  "seed": 20260909,
+  "now": "2026-09-09T10:00:00+08:00",
+  "by_language": {
+   "en": {
+    "transcripts": 100,
+    "questionnaires": 14,
+    "turns": 922,
+    "gold_spans": 631,
+    "trap_spans": 431,
+    "with_traps": 99,
+    "with_3plus_indirect": 46,
+    "common_word_personas": 24,
+    "colloquial_cjk_forms": 0,
+    "classes": [
+     "ADDRESS",
+     "AGE",
+     "DATE",
+     "DOB",
+     "EMAIL",
+     "FACILITY",
+     "HANDLE",
+     "ID",
+     "OCCUPATION",
+     "ORG",
+     "PERSON",
+     "PHONE",
+     "PLACE",
+     "URL"
+    ],
+    "gold_per_class": {
+     "ADDRESS": 26,
+     "AGE": 32,
+     "DATE": 40,
+     "DOB": 14,
+     "EMAIL": 25,
+     "FACILITY": 66,
+     "HANDLE": 14,
+     "ID": 15,
+     "OCCUPATION": 29,
+     "ORG": 30,
+     "PERSON": 265,
+     "PHONE": 10,
+     "PLACE": 47,
+     "URL": 18
+    }
+   },
+   "zh-HK": {
+    "transcripts": 100,
+    "questionnaires": 14,
+    "turns": 922,
+    "gold_spans": 573,
+    "trap_spans": 398,
+    "with_traps": 99,
+    "with_3plus_indirect": 39,
+    "common_word_personas": 0,
+    "colloquial_cjk_forms": 49,
+    "classes": [
+     "ADDRESS",
+     "AGE",
+     "DATE",
+     "DOB",
+     "EMAIL",
+     "FACILITY",
+     "HANDLE",
+     "ID",
+     "OCCUPATION",
+     "ORG",
+     "PERSON",
+     "PHONE",
+     "PLACE",
+     "URL"
+    ],
+    "gold_per_class": {
+     "ADDRESS": 30,
+     "AGE": 30,
+     "DATE": 37,
+     "DOB": 17,
+     "EMAIL": 16,
+     "FACILITY": 72,
+     "HANDLE": 18,
+     "ID": 9,
+     "OCCUPATION": 25,
+     "ORG": 32,
+     "PERSON": 230,
+     "PHONE": 14,
+     "PLACE": 34,
+     "URL": 9
+    }
+   }
+  }
+ },
+ "runs": [
+  {
+   "backend": "none",
+   "elapsed_s": 0.34,
+   "overall": {
+    "language": "all",
+    "transcripts": 200,
+    "turns": 1844,
+    "direct": {
+     "gold": 674,
+     "recalled": 674,
+     "recall": 1.0,
+     "pred": 677,
+     "correct": 674,
+     "precision": 0.9956
+    },
+    "indirect": {
+     "gold": 530,
+     "recalled": 530,
+     "recall": 1.0,
+     "pred": 547,
+     "correct": 547,
+     "precision": 1.0
+    },
+    "overall": {
+     "gold": 1204,
+     "recalled": 1204,
+     "recall": 1.0,
+     "pred": 1224,
+     "correct": 1221,
+     "precision": 0.9975
+    },
+    "per_class": {
+     "PERSON": {
+      "gold": 495,
+      "recalled": 495,
+      "recall": 1.0,
+      "pred": 498,
+      "correct": 495,
+      "precision": 0.994
+     },
+     "ID": {
+      "gold": 24,
+      "recalled": 24,
+      "recall": 1.0,
+      "pred": 24,
+      "correct": 24,
+      "precision": 1.0
+     },
+     "PHONE": {
+      "gold": 24,
+      "recalled": 24,
+      "recall": 1.0,
+      "pred": 24,
+      "correct": 24,
+      "precision": 1.0
+     },
+     "EMAIL": {
+      "gold": 41,
+      "recalled": 41,
+      "recall": 1.0,
+      "pred": 41,
+      "correct": 41,
+      "precision": 1.0
+     },
+     "HANDLE": {
+      "gold": 32,
+      "recalled": 32,
+      "recall": 1.0,
+      "pred": 32,
+      "correct": 32,
+      "precision": 1.0
+     },
+     "URL": {
+      "gold": 27,
+      "recalled": 27,
+      "recall": 1.0,
+      "pred": 27,
+      "correct": 27,
+      "precision": 1.0
+     },
+     "DOB": {
+      "gold": 31,
+      "recalled": 31,
+      "recall": 1.0,
+      "pred": 31,
+      "correct": 31,
+      "precision": 1.0
+     },
+     "FACILITY": {
+      "gold": 138,
+      "recalled": 138,
+      "recall": 1.0,
+      "pred": 138,
+      "correct": 138,
+      "precision": 1.0
+     },
+     "PLACE": {
+      "gold": 81,
+      "recalled": 81,
+      "recall": 1.0,
+      "pred": 83,
+      "correct": 83,
+      "precision": 1.0
+     },
+     "ADDRESS": {
+      "gold": 56,
+      "recalled": 56,
+      "recall": 1.0,
+      "pred": 71,
+      "correct": 71,
+      "precision": 1.0
+     },
+     "ORG": {
+      "gold": 62,
+      "recalled": 62,
+      "recall": 1.0,
+      "pred": 62,
+      "correct": 62,
+      "precision": 1.0
+     },
+     "OCCUPATION": {
+      "gold": 54,
+      "recalled": 54,
+      "recall": 1.0,
+      "pred": 54,
+      "correct": 54,
+      "precision": 1.0
+     },
+     "DATE": {
+      "gold": 77,
+      "recalled": 77,
+      "recall": 1.0,
+      "pred": 77,
+      "correct": 77,
+      "precision": 1.0
+     },
+     "AGE": {
+      "gold": 62,
+      "recalled": 62,
+      "recall": 1.0,
+      "pred": 62,
+      "correct": 62,
+      "precision": 1.0
+     }
+    },
+    "traps": 829,
+    "traps_altered": 0,
+    "over_redaction_rate": 0.0,
+    "stray_redactions": 0,
+    "linkage_turn_hist": {
+     "0": 1448,
+     "1": 292,
+     "2": 81,
+     "3": 22,
+     "4": 1
+    },
+    "linkage_transcript_hist": {
+     "0": 22,
+     "1": 41,
+     "2": 51,
+     "3": 36,
+     "4": 18,
+     "5": 29,
+     "6": 3
+    },
+    "latency_ms": {
+     "p50": 0.126,
+     "p95": 0.349,
+     "n": 1844
+    },
+    "future_dates": {
+     "total": 29,
+     "rendered_as_past": 0
+    },
+    "past_dates": {
+     "total": 48,
+     "rendered_as_future": 0
+    },
+    "dob": {
+     "gold": 31,
+     "rendered_as_dob_token": 31
+    },
+    "facility_person_confusions": 0,
+    "misses_by_kind": {},
+    "example_misses": [],
+    "example_trap_hits": [],
+    "example_strays": [],
+    "example_direction_errors": []
+   },
+   "by_language": {
+    "en": {
+     "language": "en",
+     "transcripts": 100,
+     "turns": 922,
+     "direct": {
+      "gold": 361,
+      "recalled": 361,
+      "recall": 1.0,
+      "pred": 364,
+      "correct": 361,
+      "precision": 0.9918
+     },
+     "indirect": {
+      "gold": 270,
+      "recalled": 270,
+      "recall": 1.0,
+      "pred": 270,
+      "correct": 270,
+      "precision": 1.0
+     },
+     "overall": {
+      "gold": 631,
+      "recalled": 631,
+      "recall": 1.0,
+      "pred": 634,
+      "correct": 631,
+      "precision": 0.9953
+     },
+     "per_class": {
+      "PERSON": {
+       "gold": 265,
+       "recalled": 265,
+       "recall": 1.0,
+       "pred": 268,
+       "correct": 265,
+       "precision": 0.9888
+      },
+      "ID": {
+       "gold": 15,
+       "recalled": 15,
+       "recall": 1.0,
+       "pred": 15,
+       "correct": 15,
+       "precision": 1.0
+      },
+      "PHONE": {
+       "gold": 10,
+       "recalled": 10,
+       "recall": 1.0,
+       "pred": 10,
+       "correct": 10,
+       "precision": 1.0
+      },
+      "EMAIL": {
+       "gold": 25,
+       "recalled": 25,
+       "recall": 1.0,
+       "pred": 25,
+       "correct": 25,
+       "precision": 1.0
+      },
+      "HANDLE": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "URL": {
+       "gold": 18,
+       "recalled": 18,
+       "recall": 1.0,
+       "pred": 18,
+       "correct": 18,
+       "precision": 1.0
+      },
+      "DOB": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "FACILITY": {
+       "gold": 66,
+       "recalled": 66,
+       "recall": 1.0,
+       "pred": 66,
+       "correct": 66,
+       "precision": 1.0
+      },
+      "PLACE": {
+       "gold": 47,
+       "recalled": 47,
+       "recall": 1.0,
+       "pred": 47,
+       "correct": 47,
+       "precision": 1.0
+      },
+      "ADDRESS": {
+       "gold": 26,
+       "recalled": 26,
+       "recall": 1.0,
+       "pred": 26,
+       "correct": 26,
+       "precision": 1.0
+      },
+      "ORG": {
+       "gold": 30,
+       "recalled": 30,
+       "recall": 1.0,
+       "pred": 30,
+       "correct": 30,
+       "precision": 1.0
+      },
+      "OCCUPATION": {
+       "gold": 29,
+       "recalled": 29,
+       "recall": 1.0,
+       "pred": 29,
+       "correct": 29,
+       "precision": 1.0
+      },
+      "DATE": {
+       "gold": 40,
+       "recalled": 40,
+       "recall": 1.0,
+       "pred": 40,
+       "correct": 40,
+       "precision": 1.0
+      },
+      "AGE": {
+       "gold": 32,
+       "recalled": 32,
+       "recall": 1.0,
+       "pred": 32,
+       "correct": 32,
+       "precision": 1.0
+      }
+     },
+     "traps": 431,
+     "traps_altered": 0,
+     "over_redaction_rate": 0.0,
+     "stray_redactions": 0,
+     "linkage_turn_hist": {
+      "0": 728,
+      "1": 140,
+      "2": 36,
+      "3": 17,
+      "4": 1
+     },
+     "linkage_transcript_hist": {
+      "0": 13,
+      "1": 18,
+      "2": 23,
+      "3": 22,
+      "4": 7,
+      "5": 14,
+      "6": 3
+     },
+     "latency_ms": {
+      "p50": 0.162,
+      "p95": 0.388,
+      "n": 922
+     },
+     "future_dates": {
+      "total": 19,
+      "rendered_as_past": 0
+     },
+     "past_dates": {
+      "total": 21,
+      "rendered_as_future": 0
+     },
+     "dob": {
+      "gold": 14,
+      "rendered_as_dob_token": 14
+     },
+     "facility_person_confusions": 0,
+     "misses_by_kind": {},
+     "example_misses": [],
+     "example_trap_hits": [],
+     "example_strays": [],
+     "example_direction_errors": []
+    },
+    "zh-HK": {
+     "language": "zh-HK",
+     "transcripts": 100,
+     "turns": 922,
+     "direct": {
+      "gold": 313,
+      "recalled": 313,
+      "recall": 1.0,
+      "pred": 313,
+      "correct": 313,
+      "precision": 1.0
+     },
+     "indirect": {
+      "gold": 260,
+      "recalled": 260,
+      "recall": 1.0,
+      "pred": 277,
+      "correct": 277,
+      "precision": 1.0
+     },
+     "overall": {
+      "gold": 573,
+      "recalled": 573,
+      "recall": 1.0,
+      "pred": 590,
+      "correct": 590,
+      "precision": 1.0
+     },
+     "per_class": {
+      "PERSON": {
+       "gold": 230,
+       "recalled": 230,
+       "recall": 1.0,
+       "pred": 230,
+       "correct": 230,
+       "precision": 1.0
+      },
+      "ID": {
+       "gold": 9,
+       "recalled": 9,
+       "recall": 1.0,
+       "pred": 9,
+       "correct": 9,
+       "precision": 1.0
+      },
+      "PHONE": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "EMAIL": {
+       "gold": 16,
+       "recalled": 16,
+       "recall": 1.0,
+       "pred": 16,
+       "correct": 16,
+       "precision": 1.0
+      },
+      "HANDLE": {
+       "gold": 18,
+       "recalled": 18,
+       "recall": 1.0,
+       "pred": 18,
+       "correct": 18,
+       "precision": 1.0
+      },
+      "URL": {
+       "gold": 9,
+       "recalled": 9,
+       "recall": 1.0,
+       "pred": 9,
+       "correct": 9,
+       "precision": 1.0
+      },
+      "DOB": {
+       "gold": 17,
+       "recalled": 17,
+       "recall": 1.0,
+       "pred": 17,
+       "correct": 17,
+       "precision": 1.0
+      },
+      "FACILITY": {
+       "gold": 72,
+       "recalled": 72,
+       "recall": 1.0,
+       "pred": 72,
+       "correct": 72,
+       "precision": 1.0
+      },
+      "PLACE": {
+       "gold": 34,
+       "recalled": 34,
+       "recall": 1.0,
+       "pred": 36,
+       "correct": 36,
+       "precision": 1.0
+      },
+      "ADDRESS": {
+       "gold": 30,
+       "recalled": 30,
+       "recall": 1.0,
+       "pred": 45,
+       "correct": 45,
+       "precision": 1.0
+      },
+      "ORG": {
+       "gold": 32,
+       "recalled": 32,
+       "recall": 1.0,
+       "pred": 32,
+       "correct": 32,
+       "precision": 1.0
+      },
+      "OCCUPATION": {
+       "gold": 25,
+       "recalled": 25,
+       "recall": 1.0,
+       "pred": 25,
+       "correct": 25,
+       "precision": 1.0
+      },
+      "DATE": {
+       "gold": 37,
+       "recalled": 37,
+       "recall": 1.0,
+       "pred": 37,
+       "correct": 37,
+       "precision": 1.0
+      },
+      "AGE": {
+       "gold": 30,
+       "recalled": 30,
+       "recall": 1.0,
+       "pred": 30,
+       "correct": 30,
+       "precision": 1.0
+      }
+     },
+     "traps": 398,
+     "traps_altered": 0,
+     "over_redaction_rate": 0.0,
+     "stray_redactions": 0,
+     "linkage_turn_hist": {
+      "0": 720,
+      "1": 152,
+      "2": 45,
+      "3": 5
+     },
+     "linkage_transcript_hist": {
+      "0": 9,
+      "1": 23,
+      "2": 28,
+      "3": 14,
+      "4": 11,
+      "5": 15
+     },
+     "latency_ms": {
+      "p50": 0.1,
+      "p95": 0.3,
+      "n": 922
+     },
+     "future_dates": {
+      "total": 10,
+      "rendered_as_past": 0
+     },
+     "past_dates": {
+      "total": 27,
+      "rendered_as_future": 0
+     },
+     "dob": {
+      "gold": 17,
+      "rendered_as_dob_token": 17
+     },
+     "facility_person_confusions": 0,
+     "misses_by_kind": {},
+     "example_misses": [],
+     "example_trap_hits": [],
+     "example_strays": [],
+     "example_direction_errors": []
+    }
+   }
+  },
+  {
+   "backend": "presidio",
+   "elapsed_s": 5.17,
+   "overall": {
+    "language": "all",
+    "transcripts": 200,
+    "turns": 1844,
+    "direct": {
+     "gold": 674,
+     "recalled": 669,
+     "recall": 0.9926,
+     "pred": 715,
+     "correct": 650,
+     "precision": 0.9091
+    },
+    "indirect": {
+     "gold": 530,
+     "recalled": 523,
+     "recall": 0.9868,
+     "pred": 628,
+     "correct": 536,
+     "precision": 0.8535
+    },
+    "overall": {
+     "gold": 1204,
+     "recalled": 1192,
+     "recall": 0.99,
+     "pred": 1343,
+     "correct": 1186,
+     "precision": 0.8831
+    },
+    "per_class": {
+     "PERSON": {
+      "gold": 495,
+      "recalled": 491,
+      "recall": 0.9919,
+      "pred": 537,
+      "correct": 484,
+      "precision": 0.9013
+     },
+     "ID": {
+      "gold": 24,
+      "recalled": 24,
+      "recall": 1.0,
+      "pred": 24,
+      "correct": 24,
+      "precision": 1.0
+     },
+     "PHONE": {
+      "gold": 24,
+      "recalled": 24,
+      "recall": 1.0,
+      "pred": 24,
+      "correct": 24,
+      "precision": 1.0
+     },
+     "EMAIL": {
+      "gold": 41,
+      "recalled": 41,
+      "recall": 1.0,
+      "pred": 41,
+      "correct": 32,
+      "precision": 0.7805
+     },
+     "HANDLE": {
+      "gold": 32,
+      "recalled": 32,
+      "recall": 1.0,
+      "pred": 32,
+      "correct": 32,
+      "precision": 1.0
+     },
+     "URL": {
+      "gold": 27,
+      "recalled": 27,
+      "recall": 1.0,
+      "pred": 27,
+      "correct": 24,
+      "precision": 0.8889
+     },
+     "DOB": {
+      "gold": 31,
+      "recalled": 30,
+      "recall": 0.9677,
+      "pred": 30,
+      "correct": 30,
+      "precision": 1.0
+     },
+     "FACILITY": {
+      "gold": 138,
+      "recalled": 137,
+      "recall": 0.9928,
+      "pred": 137,
+      "correct": 137,
+      "precision": 1.0
+     },
+     "PLACE": {
+      "gold": 81,
+      "recalled": 81,
+      "recall": 1.0,
+      "pred": 173,
+      "correct": 81,
+      "precision": 0.4682
+     },
+     "ADDRESS": {
+      "gold": 56,
+      "recalled": 55,
+      "recall": 0.9821,
+      "pred": 68,
+      "correct": 68,
+      "precision": 1.0
+     },
+     "ORG": {
+      "gold": 62,
+      "recalled": 61,
+      "recall": 0.9839,
+      "pred": 61,
+      "correct": 61,
+      "precision": 1.0
+     },
+     "OCCUPATION": {
+      "gold": 54,
+      "recalled": 51,
+      "recall": 0.9444,
+      "pred": 51,
+      "correct": 51,
+      "precision": 1.0
+     },
+     "DATE": {
+      "gold": 77,
+      "recalled": 76,
+      "recall": 0.987,
+      "pred": 76,
+      "correct": 76,
+      "precision": 1.0
+     },
+     "AGE": {
+      "gold": 62,
+      "recalled": 62,
+      "recall": 1.0,
+      "pred": 62,
+      "correct": 62,
+      "precision": 1.0
+     }
+    },
+    "traps": 829,
+    "traps_altered": 47,
+    "over_redaction_rate": 0.0567,
+    "stray_redactions": 96,
+    "linkage_turn_hist": {
+     "0": 1397,
+     "1": 330,
+     "2": 94,
+     "3": 21,
+     "4": 2
+    },
+    "linkage_transcript_hist": {
+     "0": 21,
+     "1": 34,
+     "2": 49,
+     "3": 43,
+     "4": 21,
+     "5": 29,
+     "6": 2,
+     "7": 1
+    },
+    "latency_ms": {
+     "p50": 2.115,
+     "p95": 5.987,
+     "n": 1844
+    },
+    "future_dates": {
+     "total": 29,
+     "rendered_as_past": 0
+    },
+    "past_dates": {
+     "total": 47,
+     "rendered_as_future": 0
+    },
+    "dob": {
+     "gold": 31,
+     "rendered_as_dob_token": 30
+    },
+    "facility_person_confusions": 1,
+    "misses_by_kind": {
+     "OCCUPATION:occ": 3,
+     "PERSON:doctor_full": 2,
+     "ADDRESS:address:estate": 1,
+     "DATE:weekday_past:prefixed": 1,
+     "DOB:dob:m月d日": 1,
+     "FACILITY:facility:trap": 1,
+     "ORG:org": 1,
+     "PERSON:other_title": 1,
+     "PERSON:patient_full": 1
+    },
+    "example_misses": [
+     {
+      "transcript": "zh-HK-002",
+      "turn": 9,
+      "role": "user",
+      "cls": "ADDRESS",
+      "kind": "address:estate",
+      "surface": "杏花邨10座7樓E室",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-002",
+      "turn": 10,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "patient_full",
+      "surface": "黃志強",
+      "scrubbed": "[PLACE_2]。"
+     },
+     {
+      "transcript": "zh-HK-005",
+      "turn": 3,
+      "role": "user",
+      "cls": "OCCUPATION",
+      "kind": "occ",
+      "surface": "清潔工",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-029",
+      "turn": 1,
+      "role": "user",
+      "cls": "FACILITY",
+      "kind": "facility:trap",
+      "surface": "瑪麗醫院",
+      "scrubbed": "[PERSON_2]: [HANDLE_1]可以搵到我。"
+     },
+     {
+      "transcript": "zh-HK-029",
+      "turn": 5,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "doctor_full",
+      "surface": "張偉文",
+      "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-053",
+      "turn": 1,
+      "role": "user",
+      "cls": "ORG",
+      "kind": "org",
+      "surface": "太古集團",
+      "scrubbed": "咳咗大約一個禮拜都唔好。我喺[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-063",
+      "turn": 1,
+      "role": "user",
+      "cls": "DOB",
+      "kind": "dob:m月d日",
+      "surface": "5月16日",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-071",
+      "turn": 3,
+      "role": "user",
+      "cls": "OCCUPATION",
+      "kind": "occ",
+      "surface": "社工",
+      "scrubbed": "一啖一啖飲得落，食嘢就難。Telegram: [HANDLE_1]可以搵到我。[DATE_1 · 12 days ago]痛得犀利咗。[FACILITY_1]嘅姑娘叫我休息。我喺[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-083",
+      "turn": 4,
+      "role": "user",
+      "cls": "DATE",
+      "kind": "weekday_past:prefixed",
+      "surface": "上個禮拜五",
+      "scrubbed": "Regarding Dysuria: - Where do you feel pain/a burning sensation when you urinate? (Choose all that apply): Other - Please specify: [PLACE_1]。 Overall severity:…"
+     },
+     {
+      "transcript": "zh-HK-084",
+      "turn": 7,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "doctor_full",
+      "surface": "李志明",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-088",
+      "turn": 5,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "other_title",
+      "surface": "王太太",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-088",
+      "turn": 5,
+      "role": "user",
+      "cls": "OCCUPATION",
+      "kind": "occ",
+      "surface": "店員",
+      "scrubbed": "[PLACE_1]。"
+     }
+    ],
+    "example_trap_hits": [
+     {
+      "transcript": "en-001",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "zofran",
+      "surface": "Zofran",
+      "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. My address is [ADDRESS_1], in case you need it."
+     },
+     {
+      "transcript": "en-004",
+      "turn": 1,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "spo2 95%",
+      "surface": "SpO2 95%",
+      "scrubbed": "The pain is back, mainly in my lower back and ribs. I had [PERSON_2] 95% on the machine."
+     },
+     {
+      "transcript": "en-010",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "herceptin",
+      "surface": "Herceptin",
+      "scrubbed": "I can manage a short walk but then I need to lie down for 2 hours. I've been on the [PLACE_1] since spring. Now that I'm [AGE · 60s], I expected some aches, bu…"
+     },
+     {
+      "transcript": "en-012",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "I'm not eating much. Everything tastes like metal. I take [PLACE_1] every morning. My email is [EMAIL_1]. I was admitted on [DATE_1 · 35 days ago] for two nigh…"
+     },
+     {
+      "transcript": "en-017",
+      "turn": 7,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Swallowing is fine. My last chemo was on [DATE_1 · 5 days ago]. My daughter [PERSON_3] came round. [PERSON_3] thinks I look pale. I take [PLACE_2] every mornin…"
+     },
+     {
+      "transcript": "en-031",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "zofran",
+      "surface": "Zofran",
+      "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. My daughter's number is [PHONE_1]. I'm [AGE · 70s], so recovery is slower."
+     },
+     {
+      "transcript": "en-042",
+      "turn": 3,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Toast this morning, nothing since. I take [PLACE_2] every morning. My date of birth is [DOB], if that helps you find me."
+     },
+     {
+      "transcript": "en-044",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Both knees and my hips. I take [PLACE_1] every morning."
+     },
+     {
+      "transcript": "en-045",
+      "turn": 9,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "No dizziness, just heavy legs. I take [PLACE_3] every morning."
+     },
+     {
+      "transcript": "en-046",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "zofran",
+      "surface": "Zofran",
+      "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I take [PLACE_2] every morning. Send it to [ADDRESS_1]."
+     },
+     {
+      "transcript": "en-046",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I take [PLACE_2] every morning. Send it to [ADDRESS_1]."
+     },
+     {
+      "transcript": "en-050",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "herceptin",
+      "surface": "Herceptin",
+      "scrubbed": "Broken. I wake at 3am and can't get back to sleep. I walked to [PLACE_1] station and had to sit down. I was treated at [FACILITY_1]. I'm at [ADDRESS_1] if some…"
+     },
+     {
+      "transcript": "en-052",
+      "turn": 7,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Congee and half a banana. I take [PLACE_2] every morning."
+     },
+     {
+      "transcript": "en-057",
+      "turn": 7,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "2 out of 5, honestly. 500mg twice a day. I take [PLACE_1] every morning. Panadol doesn't touch it."
+     },
+     {
+      "transcript": "en-060",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "tamoxifen",
+      "surface": "Tamoxifen",
+      "scrubbed": "Honestly, exhausted. I slept 10 hours and still feel drained. I take [PLACE_1] every morning. I was born in [AGE · 60s], so I'm no spring chicken."
+     },
+     {
+      "transcript": "en-061",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "zofran",
+      "surface": "Zofran",
+      "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I work as a [OCCUPATION_1] and I can't keep up. I'm [AGE · 40s] and I've never felt this tired. It got …"
+     },
+     {
+      "transcript": "en-089",
+      "turn": 1,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "spo2 95%",
+      "surface": "SpO2 95%",
+      "scrubbed": "The pain in my back has got worse. It's hard to sit. I had [PERSON_2] 95% on the machine."
+     },
+     {
+      "transcript": "en-095",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "spo2 95%",
+      "surface": "SpO2 95%",
+      "scrubbed": "Not bad, maybe 6 hours, but no energy. I had [PERSON_2] 95% on the machine. My daughter-in-law [PERSON_3] drove me to [FACILITY_1]. I still work part-time at […"
+     },
+     {
+      "transcript": "zh-HK-002",
+      "turn": 9,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "2分",
+      "surface": "2分",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-002",
+      "turn": 9,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "黃芪",
+      "surface": "黃芪",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-004",
+      "turn": 7,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "三日前",
+      "surface": "三日前",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-005",
+      "turn": 3,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "兩個鐘",
+      "surface": "兩個鐘",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-005",
+      "turn": 3,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "三日",
+      "surface": "三日",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-009",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "5 mg",
+      "surface": "5 mg",
+      "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-009",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "必理痛",
+      "surface": "必理痛",
+      "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-009",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "5 mg",
+      "surface": "5 mg",
+      "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-022",
+      "turn": 7,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "兩粒",
+      "surface": "兩粒",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-029",
+      "turn": 5,
+      "role": "user",
+      "cls": "URL",
+      "kind": "letrozole",
+      "surface": "Letrozole",
+      "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-029",
+      "turn": 5,
+      "role": "user",
+      "cls": "URL",
+      "kind": "anastrozole",
+      "surface": "Anastrozole",
+      "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-029",
+      "turn": 5,
+      "role": "user",
+      "cls": "URL",
+      "kind": "500mg",
+      "surface": "500mg",
+      "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+     },
+     {
+      "transcript": "zh-HK-058",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "黃芪",
+      "surface": "黃芪",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-058",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "上星期",
+      "surface": "上星期",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-073",
+      "turn": 3,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "必理痛",
+      "surface": "必理痛",
+      "scrubbed": "[PERSON_2]。"
+     },
+     {
+      "transcript": "zh-HK-078",
+      "turn": 1,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "兩粒",
+      "surface": "兩粒",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-079",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "必理痛",
+      "surface": "必理痛",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-079",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "六個鐘",
+      "surface": "六個鐘",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-079",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "兩粒",
+      "surface": "兩粒",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-079",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "必理痛",
+      "surface": "必理痛",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-079",
+      "turn": 5,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "花生",
+      "surface": "花生",
+      "scrubbed": "[PLACE_1]。"
+     },
+     {
+      "transcript": "zh-HK-080",
+      "turn": 3,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "衛生",
+      "surface": "衛生",
+      "scrubbed": "[PLACE_1]。"
+     }
+    ],
+    "example_strays": [
+     {
+      "transcript": "en-002",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-003",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-005",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-006",
+      "turn": 5,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_1]."
+     },
+     {
+      "transcript": "en-006",
+      "turn": 6,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Carrying shopping home to [PLACE_2].…"
+     },
+     {
+      "transcript": "en-007",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-008",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-009",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-009",
+      "turn": 9,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Telegram",
+      "scrubbed": "Some tingling in my left foot. You can find me on [PERSON_3]: [HANDLE_1]."
+     },
+     {
+      "transcript": "en-010",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-012",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-013",
+      "turn": 5,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_2]."
+     },
+     {
+      "transcript": "en-013",
+      "turn": 6,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_2]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Carrying shopping home to [PLACE_3].…"
+     },
+     {
+      "transcript": "en-015",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-016",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "[PERSON_2], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-017",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-020",
+      "turn": 5,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_2]."
+     },
+     {
+      "transcript": "en-020",
+      "turn": 6,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_2]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Walking up the hill from [PLACE_3] s…"
+     },
+     {
+      "transcript": "en-021",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-021",
+      "turn": 7,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Feverish",
+      "scrubbed": "[PERSON_3] last night, 38.2 on the thermometer."
+     },
+     {
+      "transcript": "en-022",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-022",
+      "turn": 5,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Telegram",
+      "scrubbed": "One on a bad day. I may feel better after the weekend. It may be the new tablets. You can find me on [PERSON_4]: [HANDLE_1]. My son works for [ORG_1]. SpO2 95%…"
+     },
+     {
+      "transcript": "en-024",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-025",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-026",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-027",
+      "turn": 7,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_1]."
+     },
+     {
+      "transcript": "en-027",
+      "turn": 8,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Climbing the stairs at [ADDRESS_1]. …"
+     },
+     {
+      "transcript": "en-028",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-032",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-034",
+      "turn": 1,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_1]."
+     },
+     {
+      "transcript": "en-034",
+      "turn": 2,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Walking up the hill from [PLACE_2] s…"
+     },
+     {
+      "transcript": "en-038",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+     },
+     {
+      "transcript": "en-041",
+      "turn": 2,
+      "role": "user",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Alternating",
+      "scrubbed": "Regarding Constipation/Diarrhoea: - How would you describe it/them? (Choose all that apply): Other - Please specify: [PERSON_2], [PERSON_3] said to take the sa…"
+     },
+     {
+      "transcript": "en-041",
+      "turn": 9,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Let me ask about [PLACE_1]."
+     },
+     {
+      "transcript": "en-041",
+      "turn": 10,
+      "role": "user",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Dyspnea",
+      "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Climbing the stairs at [ADDRESS_1]. …"
+     },
+     {
+      "transcript": "en-042",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-043",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-045",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PLACE",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+     },
+     {
+      "transcript": "en-047",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     },
+     {
+      "transcript": "en-051",
+      "turn": 0,
+      "role": "assistant",
+      "cls": "PERSON",
+      "kind": "stray",
+      "surface": "Florence",
+      "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+     }
+    ],
+    "example_direction_errors": []
+   },
+   "by_language": {
+    "en": {
+     "language": "en",
+     "transcripts": 100,
+     "turns": 922,
+     "direct": {
+      "gold": 361,
+      "recalled": 361,
+      "recall": 1.0,
+      "pred": 399,
+      "correct": 358,
+      "precision": 0.8972
+     },
+     "indirect": {
+      "gold": 270,
+      "recalled": 270,
+      "recall": 1.0,
+      "pred": 321,
+      "correct": 270,
+      "precision": 0.8411
+     },
+     "overall": {
+      "gold": 631,
+      "recalled": 631,
+      "recall": 1.0,
+      "pred": 720,
+      "correct": 628,
+      "precision": 0.8722
+     },
+     "per_class": {
+      "PERSON": {
+       "gold": 265,
+       "recalled": 265,
+       "recall": 1.0,
+       "pred": 303,
+       "correct": 262,
+       "precision": 0.8647
+      },
+      "ID": {
+       "gold": 15,
+       "recalled": 15,
+       "recall": 1.0,
+       "pred": 15,
+       "correct": 15,
+       "precision": 1.0
+      },
+      "PHONE": {
+       "gold": 10,
+       "recalled": 10,
+       "recall": 1.0,
+       "pred": 10,
+       "correct": 10,
+       "precision": 1.0
+      },
+      "EMAIL": {
+       "gold": 25,
+       "recalled": 25,
+       "recall": 1.0,
+       "pred": 25,
+       "correct": 25,
+       "precision": 1.0
+      },
+      "HANDLE": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "URL": {
+       "gold": 18,
+       "recalled": 18,
+       "recall": 1.0,
+       "pred": 18,
+       "correct": 18,
+       "precision": 1.0
+      },
+      "DOB": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "FACILITY": {
+       "gold": 66,
+       "recalled": 66,
+       "recall": 1.0,
+       "pred": 66,
+       "correct": 66,
+       "precision": 1.0
+      },
+      "PLACE": {
+       "gold": 47,
+       "recalled": 47,
+       "recall": 1.0,
+       "pred": 98,
+       "correct": 47,
+       "precision": 0.4796
+      },
+      "ADDRESS": {
+       "gold": 26,
+       "recalled": 26,
+       "recall": 1.0,
+       "pred": 26,
+       "correct": 26,
+       "precision": 1.0
+      },
+      "ORG": {
+       "gold": 30,
+       "recalled": 30,
+       "recall": 1.0,
+       "pred": 30,
+       "correct": 30,
+       "precision": 1.0
+      },
+      "OCCUPATION": {
+       "gold": 29,
+       "recalled": 29,
+       "recall": 1.0,
+       "pred": 29,
+       "correct": 29,
+       "precision": 1.0
+      },
+      "DATE": {
+       "gold": 40,
+       "recalled": 40,
+       "recall": 1.0,
+       "pred": 40,
+       "correct": 40,
+       "precision": 1.0
+      },
+      "AGE": {
+       "gold": 32,
+       "recalled": 32,
+       "recall": 1.0,
+       "pred": 32,
+       "correct": 32,
+       "precision": 1.0
+      }
+     },
+     "traps": 431,
+     "traps_altered": 18,
+     "over_redaction_rate": 0.0418,
+     "stray_redactions": 68,
+     "linkage_turn_hist": {
+      "0": 698,
+      "1": 160,
+      "2": 45,
+      "3": 17,
+      "4": 2
+     },
+     "linkage_transcript_hist": {
+      "0": 13,
+      "1": 13,
+      "2": 23,
+      "3": 23,
+      "4": 11,
+      "5": 14,
+      "6": 2,
+      "7": 1
+     },
+     "latency_ms": {
+      "p50": 3.116,
+      "p95": 6.674,
+      "n": 922
+     },
+     "future_dates": {
+      "total": 19,
+      "rendered_as_past": 0
+     },
+     "past_dates": {
+      "total": 21,
+      "rendered_as_future": 0
+     },
+     "dob": {
+      "gold": 14,
+      "rendered_as_dob_token": 14
+     },
+     "facility_person_confusions": 0,
+     "misses_by_kind": {},
+     "example_misses": [],
+     "example_trap_hits": [
+      {
+       "transcript": "en-001",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "zofran",
+       "surface": "Zofran",
+       "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. My address is [ADDRESS_1], in case you need it."
+      },
+      {
+       "transcript": "en-004",
+       "turn": 1,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "spo2 95%",
+       "surface": "SpO2 95%",
+       "scrubbed": "The pain is back, mainly in my lower back and ribs. I had [PERSON_2] 95% on the machine."
+      },
+      {
+       "transcript": "en-010",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "herceptin",
+       "surface": "Herceptin",
+       "scrubbed": "I can manage a short walk but then I need to lie down for 2 hours. I've been on the [PLACE_1] since spring. Now that I'm [AGE · 60s], I expected some aches, bu…"
+      },
+      {
+       "transcript": "en-012",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "I'm not eating much. Everything tastes like metal. I take [PLACE_1] every morning. My email is [EMAIL_1]. I was admitted on [DATE_1 · 35 days ago] for two nigh…"
+      },
+      {
+       "transcript": "en-017",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Swallowing is fine. My last chemo was on [DATE_1 · 5 days ago]. My daughter [PERSON_3] came round. [PERSON_3] thinks I look pale. I take [PLACE_2] every mornin…"
+      },
+      {
+       "transcript": "en-031",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "zofran",
+       "surface": "Zofran",
+       "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. My daughter's number is [PHONE_1]. I'm [AGE · 70s], so recovery is slower."
+      },
+      {
+       "transcript": "en-042",
+       "turn": 3,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Toast this morning, nothing since. I take [PLACE_2] every morning. My date of birth is [DOB], if that helps you find me."
+      },
+      {
+       "transcript": "en-044",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Both knees and my hips. I take [PLACE_1] every morning."
+      },
+      {
+       "transcript": "en-045",
+       "turn": 9,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "No dizziness, just heavy legs. I take [PLACE_3] every morning."
+      },
+      {
+       "transcript": "en-046",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "zofran",
+       "surface": "Zofran",
+       "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I take [PLACE_2] every morning. Send it to [ADDRESS_1]."
+      },
+      {
+       "transcript": "en-046",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I take [PLACE_2] every morning. Send it to [ADDRESS_1]."
+      },
+      {
+       "transcript": "en-050",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "herceptin",
+       "surface": "Herceptin",
+       "scrubbed": "Broken. I wake at 3am and can't get back to sleep. I walked to [PLACE_1] station and had to sit down. I was treated at [FACILITY_1]. I'm at [ADDRESS_1] if some…"
+      },
+      {
+       "transcript": "en-052",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Congee and half a banana. I take [PLACE_2] every morning."
+      },
+      {
+       "transcript": "en-057",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "2 out of 5, honestly. 500mg twice a day. I take [PLACE_1] every morning. Panadol doesn't touch it."
+      },
+      {
+       "transcript": "en-060",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "tamoxifen",
+       "surface": "Tamoxifen",
+       "scrubbed": "Honestly, exhausted. I slept 10 hours and still feel drained. I take [PLACE_1] every morning. I was born in [AGE · 60s], so I'm no spring chicken."
+      },
+      {
+       "transcript": "en-061",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "zofran",
+       "surface": "Zofran",
+       "scrubbed": "Nausea again. The [PLACE_1] helps a bit but not enough. I work as a [OCCUPATION_1] and I can't keep up. I'm [AGE · 40s] and I've never felt this tired. It got …"
+      },
+      {
+       "transcript": "en-089",
+       "turn": 1,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "spo2 95%",
+       "surface": "SpO2 95%",
+       "scrubbed": "The pain in my back has got worse. It's hard to sit. I had [PERSON_2] 95% on the machine."
+      },
+      {
+       "transcript": "en-095",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "spo2 95%",
+       "surface": "SpO2 95%",
+       "scrubbed": "Not bad, maybe 6 hours, but no energy. I had [PERSON_2] 95% on the machine. My daughter-in-law [PERSON_3] drove me to [FACILITY_1]. I still work part-time at […"
+      }
+     ],
+     "example_strays": [
+      {
+       "transcript": "en-002",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-003",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-005",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-006",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "en-006",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Carrying shopping home to [PLACE_2].…"
+      },
+      {
+       "transcript": "en-007",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-008",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-009",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-009",
+       "turn": 9,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Telegram",
+       "scrubbed": "Some tingling in my left foot. You can find me on [PERSON_3]: [HANDLE_1]."
+      },
+      {
+       "transcript": "en-010",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-012",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-013",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_2]."
+      },
+      {
+       "transcript": "en-013",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_2]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Carrying shopping home to [PLACE_3].…"
+      },
+      {
+       "transcript": "en-015",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-016",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "[PERSON_2], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-017",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-020",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_2]."
+      },
+      {
+       "transcript": "en-020",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_2]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Walking up the hill from [PLACE_3] s…"
+      },
+      {
+       "transcript": "en-021",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-021",
+       "turn": 7,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Feverish",
+       "scrubbed": "[PERSON_3] last night, 38.2 on the thermometer."
+      },
+      {
+       "transcript": "en-022",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-022",
+       "turn": 5,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Telegram",
+       "scrubbed": "One on a bad day. I may feel better after the weekend. It may be the new tablets. You can find me on [PERSON_4]: [HANDLE_1]. My son works for [ORG_1]. SpO2 95%…"
+      },
+      {
+       "transcript": "en-024",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-025",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-026",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-027",
+       "turn": 7,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "en-027",
+       "turn": 8,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Climbing the stairs at [ADDRESS_1]. …"
+      },
+      {
+       "transcript": "en-028",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-032",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-034",
+       "turn": 1,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "en-034",
+       "turn": 2,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Walking up the hill from [PLACE_2] s…"
+      },
+      {
+       "transcript": "en-038",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], I'm [PERSON_2]. How are you feeling today?"
+      },
+      {
+       "transcript": "en-041",
+       "turn": 2,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Alternating",
+       "scrubbed": "Regarding Constipation/Diarrhoea: - How would you describe it/them? (Choose all that apply): Other - Please specify: [PERSON_2], [PERSON_3] said to take the sa…"
+      },
+      {
+       "transcript": "en-041",
+       "turn": 9,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "en-041",
+       "turn": 10,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: Climbing the stairs at [ADDRESS_1]. …"
+      },
+      {
+       "transcript": "en-042",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-043",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-045",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello [PERSON_1], it's [PLACE_1]. How are things since we last spoke?"
+      },
+      {
+       "transcript": "en-047",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      },
+      {
+       "transcript": "en-051",
+       "turn": 0,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "Florence",
+       "scrubbed": "Hello, I'm [PERSON_2]. I'm here for your health check-in. How are you feeling?"
+      }
+     ],
+     "example_direction_errors": []
+    },
+    "zh-HK": {
+     "language": "zh-HK",
+     "transcripts": 100,
+     "turns": 922,
+     "direct": {
+      "gold": 313,
+      "recalled": 308,
+      "recall": 0.984,
+      "pred": 316,
+      "correct": 292,
+      "precision": 0.9241
+     },
+     "indirect": {
+      "gold": 260,
+      "recalled": 253,
+      "recall": 0.9731,
+      "pred": 307,
+      "correct": 266,
+      "precision": 0.8664
+     },
+     "overall": {
+      "gold": 573,
+      "recalled": 561,
+      "recall": 0.9791,
+      "pred": 623,
+      "correct": 558,
+      "precision": 0.8957
+     },
+     "per_class": {
+      "PERSON": {
+       "gold": 230,
+       "recalled": 226,
+       "recall": 0.9826,
+       "pred": 234,
+       "correct": 222,
+       "precision": 0.9487
+      },
+      "ID": {
+       "gold": 9,
+       "recalled": 9,
+       "recall": 1.0,
+       "pred": 9,
+       "correct": 9,
+       "precision": 1.0
+      },
+      "PHONE": {
+       "gold": 14,
+       "recalled": 14,
+       "recall": 1.0,
+       "pred": 14,
+       "correct": 14,
+       "precision": 1.0
+      },
+      "EMAIL": {
+       "gold": 16,
+       "recalled": 16,
+       "recall": 1.0,
+       "pred": 16,
+       "correct": 7,
+       "precision": 0.4375
+      },
+      "HANDLE": {
+       "gold": 18,
+       "recalled": 18,
+       "recall": 1.0,
+       "pred": 18,
+       "correct": 18,
+       "precision": 1.0
+      },
+      "URL": {
+       "gold": 9,
+       "recalled": 9,
+       "recall": 1.0,
+       "pred": 9,
+       "correct": 6,
+       "precision": 0.6667
+      },
+      "DOB": {
+       "gold": 17,
+       "recalled": 16,
+       "recall": 0.9412,
+       "pred": 16,
+       "correct": 16,
+       "precision": 1.0
+      },
+      "FACILITY": {
+       "gold": 72,
+       "recalled": 71,
+       "recall": 0.9861,
+       "pred": 71,
+       "correct": 71,
+       "precision": 1.0
+      },
+      "PLACE": {
+       "gold": 34,
+       "recalled": 34,
+       "recall": 1.0,
+       "pred": 75,
+       "correct": 34,
+       "precision": 0.4533
+      },
+      "ADDRESS": {
+       "gold": 30,
+       "recalled": 29,
+       "recall": 0.9667,
+       "pred": 42,
+       "correct": 42,
+       "precision": 1.0
+      },
+      "ORG": {
+       "gold": 32,
+       "recalled": 31,
+       "recall": 0.9688,
+       "pred": 31,
+       "correct": 31,
+       "precision": 1.0
+      },
+      "OCCUPATION": {
+       "gold": 25,
+       "recalled": 22,
+       "recall": 0.88,
+       "pred": 22,
+       "correct": 22,
+       "precision": 1.0
+      },
+      "DATE": {
+       "gold": 37,
+       "recalled": 36,
+       "recall": 0.973,
+       "pred": 36,
+       "correct": 36,
+       "precision": 1.0
+      },
+      "AGE": {
+       "gold": 30,
+       "recalled": 30,
+       "recall": 1.0,
+       "pred": 30,
+       "correct": 30,
+       "precision": 1.0
+      }
+     },
+     "traps": 398,
+     "traps_altered": 29,
+     "over_redaction_rate": 0.0729,
+     "stray_redactions": 28,
+     "linkage_turn_hist": {
+      "0": 699,
+      "1": 170,
+      "2": 49,
+      "3": 4
+     },
+     "linkage_transcript_hist": {
+      "0": 8,
+      "1": 21,
+      "2": 26,
+      "3": 20,
+      "4": 10,
+      "5": 15
+     },
+     "latency_ms": {
+      "p50": 1.676,
+      "p95": 4.892,
+      "n": 922
+     },
+     "future_dates": {
+      "total": 10,
+      "rendered_as_past": 0
+     },
+     "past_dates": {
+      "total": 26,
+      "rendered_as_future": 0
+     },
+     "dob": {
+      "gold": 17,
+      "rendered_as_dob_token": 16
+     },
+     "facility_person_confusions": 1,
+     "misses_by_kind": {
+      "OCCUPATION:occ": 3,
+      "PERSON:doctor_full": 2,
+      "ADDRESS:address:estate": 1,
+      "DATE:weekday_past:prefixed": 1,
+      "DOB:dob:m月d日": 1,
+      "FACILITY:facility:trap": 1,
+      "ORG:org": 1,
+      "PERSON:other_title": 1,
+      "PERSON:patient_full": 1
+     },
+     "example_misses": [
+      {
+       "transcript": "zh-HK-002",
+       "turn": 9,
+       "role": "user",
+       "cls": "ADDRESS",
+       "kind": "address:estate",
+       "surface": "杏花邨10座7樓E室",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-002",
+       "turn": 10,
+       "role": "assistant",
+       "cls": "PERSON",
+       "kind": "patient_full",
+       "surface": "黃志強",
+       "scrubbed": "[PLACE_2]。"
+      },
+      {
+       "transcript": "zh-HK-005",
+       "turn": 3,
+       "role": "user",
+       "cls": "OCCUPATION",
+       "kind": "occ",
+       "surface": "清潔工",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-029",
+       "turn": 1,
+       "role": "user",
+       "cls": "FACILITY",
+       "kind": "facility:trap",
+       "surface": "瑪麗醫院",
+       "scrubbed": "[PERSON_2]: [HANDLE_1]可以搵到我。"
+      },
+      {
+       "transcript": "zh-HK-029",
+       "turn": 5,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "doctor_full",
+       "surface": "張偉文",
+       "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-053",
+       "turn": 1,
+       "role": "user",
+       "cls": "ORG",
+       "kind": "org",
+       "surface": "太古集團",
+       "scrubbed": "咳咗大約一個禮拜都唔好。我喺[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-063",
+       "turn": 1,
+       "role": "user",
+       "cls": "DOB",
+       "kind": "dob:m月d日",
+       "surface": "5月16日",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-071",
+       "turn": 3,
+       "role": "user",
+       "cls": "OCCUPATION",
+       "kind": "occ",
+       "surface": "社工",
+       "scrubbed": "一啖一啖飲得落，食嘢就難。Telegram: [HANDLE_1]可以搵到我。[DATE_1 · 12 days ago]痛得犀利咗。[FACILITY_1]嘅姑娘叫我休息。我喺[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-083",
+       "turn": 4,
+       "role": "user",
+       "cls": "DATE",
+       "kind": "weekday_past:prefixed",
+       "surface": "上個禮拜五",
+       "scrubbed": "Regarding Dysuria: - Where do you feel pain/a burning sensation when you urinate? (Choose all that apply): Other - Please specify: [PLACE_1]。 Overall severity:…"
+      },
+      {
+       "transcript": "zh-HK-084",
+       "turn": 7,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "doctor_full",
+       "surface": "李志明",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-088",
+       "turn": 5,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "other_title",
+       "surface": "王太太",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-088",
+       "turn": 5,
+       "role": "user",
+       "cls": "OCCUPATION",
+       "kind": "occ",
+       "surface": "店員",
+       "scrubbed": "[PLACE_1]。"
+      }
+     ],
+     "example_trap_hits": [
+      {
+       "transcript": "zh-HK-002",
+       "turn": 9,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "2分",
+       "surface": "2分",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-002",
+       "turn": 9,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "黃芪",
+       "surface": "黃芪",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-004",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "三日前",
+       "surface": "三日前",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-005",
+       "turn": 3,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "兩個鐘",
+       "surface": "兩個鐘",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-005",
+       "turn": 3,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "三日",
+       "surface": "三日",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-009",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "5 mg",
+       "surface": "5 mg",
+       "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-009",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "必理痛",
+       "surface": "必理痛",
+       "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-009",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "5 mg",
+       "surface": "5 mg",
+       "scrubbed": "痛得犀利就食Oxycodone 5 [PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-022",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "兩粒",
+       "surface": "兩粒",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-029",
+       "turn": 5,
+       "role": "user",
+       "cls": "URL",
+       "kind": "letrozole",
+       "surface": "Letrozole",
+       "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-029",
+       "turn": 5,
+       "role": "user",
+       "cls": "URL",
+       "kind": "anastrozole",
+       "surface": "Anastrozole",
+       "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-029",
+       "turn": 5,
+       "role": "user",
+       "cls": "URL",
+       "kind": "500mg",
+       "surface": "500mg",
+       "scrubbed": "暖包有少少幫助。我食咗幾個李子。[URL_1]"
+      },
+      {
+       "transcript": "zh-HK-058",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "黃芪",
+       "surface": "黃芪",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-058",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "上星期",
+       "surface": "上星期",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-073",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "必理痛",
+       "surface": "必理痛",
+       "scrubbed": "[PERSON_2]。"
+      },
+      {
+       "transcript": "zh-HK-078",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "兩粒",
+       "surface": "兩粒",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "必理痛",
+       "surface": "必理痛",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "六個鐘",
+       "surface": "六個鐘",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "兩粒",
+       "surface": "兩粒",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "必理痛",
+       "surface": "必理痛",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "花生",
+       "surface": "花生",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-080",
+       "turn": 3,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "衛生",
+       "surface": "衛生",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-084",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "必理痛",
+       "surface": "必理痛",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-084",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "六個鐘",
+       "surface": "六個鐘",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-084",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "兩粒",
+       "surface": "兩粒",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-084",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "上星期",
+       "surface": "上星期",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-088",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "一個鐘一次",
+       "surface": "一個鐘一次",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-088",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "何時發生",
+       "surface": "何時發生",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-093",
+       "turn": 1,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "4個鐘",
+       "surface": "4個鐘",
+       "scrubbed": "[PLACE_1]"
+      }
+     ],
+     "example_strays": [
+      {
+       "transcript": "zh-HK-002",
+       "turn": 7,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "冇痱滋，只係冇味。",
+       "scrubbed": "[PLACE_1]"
+      },
+      {
+       "transcript": "zh-HK-006",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-006",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 喺[ADDRESS_1]行樓梯。 Overall severity: M…"
+      },
+      {
+       "transcript": "zh-HK-009",
+       "turn": 7,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "對腳冇力但冇麻。",
+       "scrubbed": "[PERSON_3]"
+      },
+      {
+       "transcript": "zh-HK-027",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-027",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 喺將[ADDRESS_1][ADDRESS_2]行樓梯。 Overall…"
+      },
+      {
+       "transcript": "zh-HK-034",
+       "turn": 7,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-034",
+       "turn": 8,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 由[PLACE_2]站行上斜。 Overall severity: Mo…"
+      },
+      {
+       "transcript": "zh-HK-039",
+       "turn": 9,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "對腳冇力但冇麻。",
+       "scrubbed": "[PERSON_3]"
+      },
+      {
+       "transcript": "zh-HK-041",
+       "turn": 7,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-041",
+       "turn": 8,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: [PLACE_2] Overall severity: Mild (1)"
+      },
+      {
+       "transcript": "zh-HK-048",
+       "turn": 9,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-048",
+       "turn": 10,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 拎餸返[PLACE_2]。 Overall severity: Seve…"
+      },
+      {
+       "transcript": "zh-HK-055",
+       "turn": 9,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-055",
+       "turn": 10,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 講耐啲嘢就氣促，血氧95%。 Overall severity: Mod…"
+      },
+      {
+       "transcript": "zh-HK-062",
+       "turn": 1,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-062",
+       "turn": 2,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 由[PLACE_2]站行上斜。 Overall severity: Mi…"
+      },
+      {
+       "transcript": "zh-HK-067",
+       "turn": 5,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "吞嘢冇問題",
+       "scrubbed": "[PLACE_1]。"
+      },
+      {
+       "transcript": "zh-HK-069",
+       "turn": 7,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-069",
+       "turn": 8,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 由[PLACE_2]站行上斜。 Overall severity: Mo…"
+      },
+      {
+       "transcript": "zh-HK-079",
+       "turn": 3,
+       "role": "user",
+       "cls": "PERSON",
+       "kind": "stray",
+       "surface": "兩邊膝頭同髖骹",
+       "scrubbed": "[PERSON_3]。"
+      },
+      {
+       "transcript": "zh-HK-083",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_2]."
+      },
+      {
+       "transcript": "zh-HK-083",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_2]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 由[PLACE_3]站行上斜。 Overall severity: Se…"
+      },
+      {
+       "transcript": "zh-HK-087",
+       "turn": 9,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "冇痱滋，只係冇味。",
+       "scrubbed": "[PLACE_2]"
+      },
+      {
+       "transcript": "zh-HK-090",
+       "turn": 1,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-090",
+       "turn": 2,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: [PLACE_2] Overall severity: Moderate…"
+      },
+      {
+       "transcript": "zh-HK-097",
+       "turn": 5,
+       "role": "assistant",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Let me ask about [PLACE_1]."
+      },
+      {
+       "transcript": "zh-HK-097",
+       "turn": 6,
+       "role": "user",
+       "cls": "PLACE",
+       "kind": "stray",
+       "surface": "Dyspnea",
+       "scrubbed": "Regarding [PLACE_1]: - What activities usually cause shortness of breath? (Choose all that apply): Other - Please specify: 喺將[ADDRESS_1][ADDRESS_2]行樓梯。 Overall…"
+      }
+     ],
+     "example_direction_errors": []
+    }
+   }
+  }
+ ]
+}

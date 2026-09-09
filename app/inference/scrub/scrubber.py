@@ -17,7 +17,7 @@ from typing import Any, Iterable
 
 from .gazetteers import gazetteer_spans
 from .generalise import DEFAULT_TZ, _today, generalise_spans
-from .names import KnownIdentifiers, KnownMatcher, SessionMatcher, name_rules, phone_regex
+from .names import LAYER_NAMES, KnownIdentifiers, KnownMatcher, SessionMatcher, name_rules, phone_regex
 from .ner import NERBackend, NullBackend, ner_spans
 from .patterns import pattern_spans
 from .tokens import (
@@ -61,6 +61,30 @@ class ScrubResult:
     text: str
     report: ScrubReport
     spans: list[ResolvedSpan] = field(default_factory=list)
+
+
+def propagate_names(text: str, candidates: Iterable[Span]) -> list[Span]:
+    """A person found by a cue rule in this text ("my friend Mary") names every
+    other occurrence of the same surface in the same text ("Mary drove"), so a
+    repeat mention in the same turn is scrubbed even though its cue is gone —
+    the within-turn counterpart of the session-known layer (A0). Latin surfaces
+    match exactly as written (Capitalised), CJK exactly; the resolver still lets
+    a longer span such as "Queen Mary Hospital" win."""
+    seen: set[str] = set()
+    out: list[Span] = []
+    for c in candidates:
+        if c.cls != PERSON or c.layer != LAYER_NAMES:
+            continue
+        surface = text[c.start:c.end].strip()
+        if not surface or surface in seen:
+            continue
+        seen.add(surface)
+        regex = re.compile(re.escape(surface) if has_cjk(surface) else flexible_literal(surface))
+        for m in regex.finditer(text):
+            if m.start() == c.start:
+                continue
+            out.append(Span(m.start(), m.end(), PERSON, c.priority - 1, LAYER_NAMES, key=c.key or surface))
+    return out
 
 
 def resolve_spans(spans: Iterable[Span]) -> list[Span]:
@@ -119,6 +143,7 @@ class Scrubber:
         if not isinstance(self.ner, NullBackend):
             candidates += self._run("ner", ner_spans, text, self.ner, language)
         candidates += self._run("generalise", generalise_spans, text, now=now, tz=self.tz, dob=self.known.dob)
+        candidates += self._run("names", propagate_names, text, candidates)
 
         return self._run("resolve", self._apply, text, candidates, token_map, started)
 
@@ -268,6 +293,6 @@ def leak_check(messages: Iterable[dict], known: Iterable[str] | None, token_map:
 
 
 __all__ = [
-    "ResolvedSpan", "ScrubContext", "ScrubReport", "ScrubResult", "Scrubber", "leak_check", "resolve_spans",
+    "ResolvedSpan", "ScrubContext", "ScrubReport", "ScrubResult", "Scrubber", "leak_check", "propagate_names", "resolve_spans",
     "scrub_messages", "scrub_text",
 ]

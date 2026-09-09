@@ -60,14 +60,18 @@ PHONE_CUE = _cue(
 
 EMAIL_RE = re.compile(rf"{LB}[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{{2,}}{RB}")
 
+# A URL never contains CJK or a sentence-final stop ("我喺bit.ly/x睇到。", "see www.x.com.").
+_URL_TAIL = r"[A-Za-z0-9\-._~:/?#@!$&*+;=%]*[A-Za-z0-9/_\-#=~]"
 URL_RE = re.compile(
-    r"(?:https?://|www\.)[^\s<>\"'（）()]+"
+    rf"(?:https?://|www\.){_URL_TAIL}"
     rf"|{LB}[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.(?:com|net|org|hk|io|co|edu|gov|info|me|app|tv|cn|uk|us)(?:\.hk)?(?:/[^\s]*)?{RB}",
     re.IGNORECASE,
 )
 
-_HANDLE_BODY = r"@?(?=[\w.]*[A-Za-z_])[\w.]{3,}"
-HANDLE_AT_RE = re.compile(r"(?<![A-Za-z0-9._])@(?=[\w.]*[A-Za-z_])[\w.]{3,}")
+# Handles are ASCII (\w would run into CJK text: "Telegram: chan_dm可以搵到我") and never end
+# with the sentence's full stop ("my Instagram account is grace.tam.").
+_HANDLE_BODY = r"@?(?=[A-Za-z0-9_.]*[A-Za-z_])[A-Za-z0-9_.]{2,}[A-Za-z0-9_]"
+HANDLE_AT_RE = re.compile(r"(?<![A-Za-z0-9._])@(?=[A-Za-z0-9_.]*[A-Za-z_])[A-Za-z0-9_.]{2,}[A-Za-z0-9_]")
 HANDLE_PLATFORM_RE = re.compile(
     r"(?:whatsapp|wechat|instagram|telegram|facebook|微信|電報|\bIG\b|\bFB\b)"
     r"(?:\s*(?:id|account|handle|name|username|帳號|賬號|號|名)\s*(?:[:：]|is|係|是)?|\s*[:：])\s*"
@@ -84,7 +88,9 @@ MRN_DIGITS_RE = re.compile(
     r"|(?:保單|病歷|檔案|編號|個案)\s*(?:號碼|號|編號)?\s*[:：#]?\s*(\d{5,10})(?!\d)",
     re.IGNORECASE,
 )
-MRN_CUE = _cue(r"policy|medical record|reference|ref|no\.|MRN|case no|case number", r"保單|病歷|編號|檔案|個案")
+MRN_CUE = _cue(r"policy|medical record|record|reference|ref|no\.|MRN|case no|case number", r"保單|病歷|編號|檔案|個案")
+# "My medical record number is HK-1234567" puts 24 chars between cue and value.
+MRN_WINDOW = 30
 
 CARD_RE = re.compile(r"(?<![\d])(?:\d[ \-]?){12,18}\d(?![\d])")
 
@@ -169,30 +175,47 @@ _ZH_GENERIC = frozenset({
 _ZH_BUILDING = r"(?:新邨|邨|苑|花園|大廈|閣|台|臺|軒|居|灣畔|城|中心|廣場|大樓|樓|別墅|山莊|豪庭|半島)"
 
 
+# 會 is a function word (will/can) and stops the leftward walk — except inside the
+# organisation compounds that name Hong Kong institutions (賽馬會診所, 浸會大學, 街坊會).
+_PASSABLE_WUI_RE = re.compile(r"(?:賽馬|基金|同鄉|婦女|街坊|互助|青年|體育|校友|家長|浸|協|商|工|學|公|總|聯|教|農|漁)會$")
+
+
 def _extend_left(text: str, suffix_start: int, max_len: int) -> int:
     """Walk left from ``suffix_start`` over CJK/Latin/digit chars, stopping at a
     function word, punctuation or the length cap. Returns the name start."""
     i = suffix_start
     while i > 0 and suffix_start - i < max_len:
         ch = text[i - 1]
-        if ch in ZH_STOP or not (has_cjk(ch) or ch.isalnum()):
+        if ch in ZH_STOP and not (ch == "會" and _PASSABLE_WUI_RE.search(text[:i])):
+            break
+        if not (has_cjk(ch) or ch.isalnum()):
             break
         i -= 1
     return i
 
 
-def _cjk_suffix_spans(text: str, suffix_re: re.Pattern, cls: str, max_len: int, *, gate=None) -> list[Span]:
+_DIRECTION = "東南西北"
+
+
+def _cjk_suffix_spans(text: str, suffix_re: re.Pattern, cls: str, max_len: int, *, gate=None, min_prefix: int = 1,
+                      direction: bool = False) -> list[Span]:
+    """``min_prefix`` chars must precede the suffix (填保險 is a verb phrase, not an
+    ORG); ``direction`` extends a street over a trailing 東/南/西/北 when that
+    character ends the name (太子道西235號, not 知道西環)."""
     out = []
     for m in suffix_re.finditer(text):
         start = _extend_left(text, m.start(), max_len)
-        if start == m.start():
+        if start == m.start() or m.start() - start < min_prefix:
             continue
         name = text[start:m.end()]
         if name in _ZH_GENERIC or text[start:m.start()] in _ZH_GENERIC:
             continue
-        if gate is not None and not gate(text, start, m.end()):
+        end = m.end()
+        if direction and end < len(text) and text[end] in _DIRECTION and (end + 1 == len(text) or not has_cjk(text[end + 1])):
+            end += 1
+        if gate is not None and not gate(text, start, end):
             continue
-        out.append(Span(start, m.end(), cls, PRIORITY_PATTERNS, LAYER))
+        out.append(Span(start, end, cls, PRIORITY_PATTERNS, LAYER))
     return out
 
 
@@ -220,7 +243,7 @@ def _street_gate(text: str, start: int, end: int) -> bool:
     return any(after.startswith(p) for p in _ZH_STREET_CUE_AFTER)
 
 
-STREET_NUMBER_ZH_RE = re.compile(rf"[道街路里徑巷]\s*\d{{1,4}}(?:-\d{{1,4}})?號")
+STREET_NUMBER_ZH_RE = re.compile(rf"[道街路里徑巷][東南西北]?\s*\d{{1,4}}(?:-\d{{1,4}})?號")
 UNIT_ZH_RE = re.compile(
     rf"(?:第?(?:[A-Z]{{1,2}}|\d{{1,3}}|[{CJK}])座\s*\d{{1,3}}樓(?:\s*[A-Z0-9]{{1,5}}室)?"
     rf"|\d{{1,3}}樓\s*[A-Z0-9]{{1,5}}室"
@@ -282,7 +305,7 @@ def pattern_spans(text: str) -> list[Span]:
         if _near(text, m.start(), m.end(), PASSPORT_CUE):
             add(Span(m.start(), m.end(), ID, PRIORITY_PATTERNS, LAYER))
     for m in MRN_RE.finditer(text):
-        if _near(text, m.start(), m.end(), MRN_CUE):
+        if _near(text, m.start(), m.end(), MRN_CUE, MRN_WINDOW, MRN_WINDOW):
             add(Span(m.start(), m.end(), ID, PRIORITY_PATTERNS, LAYER))
     for m in MRN_DIGITS_RE.finditer(text):
         g = 1 if m.group(1) else 2
@@ -312,8 +335,8 @@ def pattern_spans(text: str) -> list[Span]:
 
     if has_cjk(text):
         spans.extend(_cjk_suffix_spans(text, FACILITY_ZH_SUFFIX_RE, FACILITY, 10))
-        spans.extend(_cjk_suffix_spans(text, ORG_ZH_SUFFIX_RE, ORG, 10))
-        spans.extend(_cjk_suffix_spans(text, STREET_ZH_SUFFIX_RE, PLACE, 6, gate=_street_gate))
+        spans.extend(_cjk_suffix_spans(text, ORG_ZH_SUFFIX_RE, ORG, 10, min_prefix=2))
+        spans.extend(_cjk_suffix_spans(text, STREET_ZH_SUFFIX_RE, PLACE, 6, gate=_street_gate, direction=True))
         spans.extend(_address_zh_spans(text))
     return spans
 

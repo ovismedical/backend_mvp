@@ -37,15 +37,25 @@ _CUE_BEFORE_RE = re.compile(
     re.IGNORECASE,
 )
 _CUE_BEFORE_ZH_RE = re.compile(r"血壓|體溫|體重|血糖|心跳|脈搏|血氧|分|劑量|評分")
+_GUARD_BREAK_RE = re.compile(r"[.!?。！？\n]")
+
+
+def _before(text: str, start: int, window: int) -> str:
+    """The ``window`` chars before ``start``, cut at the last sentence boundary so
+    a reading in the previous sentence ("...about the dose. I'm 78") cannot
+    guard a number in this one."""
+    before = text[max(0, start - window):start]
+    breaks = list(_GUARD_BREAK_RE.finditer(before))
+    return before[breaks[-1].end():] if breaks else before
 
 
 def clinical_guarded(text: str, start: int, end: int) -> bool:
     """True when the number at ``text[start:end]`` is a clinical quantity."""
     if _UNIT_AFTER_RE.match(text[end:end + 12]):
         return True
-    if _CUE_BEFORE_RE.search(text[max(0, start - 20):start]):
+    if _CUE_BEFORE_RE.search(_before(text, start, 20)):
         return True
-    return bool(_CUE_BEFORE_ZH_RE.search(text[max(0, start - 6):start]))
+    return bool(_CUE_BEFORE_ZH_RE.search(_before(text, start, 6)))
 
 
 # --- vocab -----------------------------------------------------------------------------
@@ -95,10 +105,13 @@ def zh_number(s: str) -> int | None:
 
 # --- date expressions ---------------------------------------------------------------------
 _D = r"(\d{1,2})(?:st|nd|rd|th)?"
-DMY_RE = re.compile(rf"{LB}{_D}\s+(?:of\s+)?({_MONTH_RE})\.?(?:,?\s+(\d{{4}}))?{RB}", re.IGNORECASE)
+# The month's abbreviation dot is consumed only when a year follows ("22 Aug. 1966"),
+# never a sentence-final full stop ("on 15 September.").
+DMY_RE = re.compile(rf"{LB}{_D}\s+(?:of\s+)?({_MONTH_RE})(?:\.(?=,?\s+\d{{4}}))?(?:,?\s+(\d{{4}}))?{RB}", re.IGNORECASE)
 MDY_RE = re.compile(rf"{LB}({_MONTH_RE})\.?\s+{_D}(?:,?\s+(\d{{4}}))?{RB}", re.IGNORECASE)
-SLASH_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\d/.])")
-DOT_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?![\d.])")
+# A trailing "." is a sentence end ("since 5/8.") unless a digit follows it (1.5/2.0).
+SLASH_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\d/]|\.\d)")
+DOT_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?!\d|\.\d)")
 ISO_RE = re.compile(r"(?<![\d])(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?![\d])")
 ZH_DATE_RE = re.compile(r"(?:(\d{4}|\d{2})\s*年\s*)?(\d{1,2})\s*月\s*(\d{1,2})\s*[日號]")
 ZH_DATE_NUM_RE = re.compile(r"(?:([一二三四五六七八九零〇]{2,4})年)?([一二三四五六七八九十]{1,2})月([一二三四五六七八九十廿卅]{1,3})[日號]")
@@ -221,6 +234,7 @@ class _Hit:
     weekday: int | None = None
     mode: str | None = None        # weekday: past | last | next ; day: past | next
     age: int | None = None
+    numeric: bool = False          # bare d/m or d.m.y — the only date forms a clinical reading can mimic
 
 
 def _find_dates(text: str, today: date | None) -> list[_Hit]:
@@ -262,19 +276,21 @@ def _find_dates(text: str, today: date | None) -> list[_Hit]:
 def _numeric(start: int, end: int, a: int, b: int, y: int | None) -> list[_Hit]:
     """DD/MM first (HK locale); MM/DD only if DD/MM is invalid. Never emit for a
     pair that fits neither (98/60, 120/80)."""
+    # Only a year-less pair (7/10, 6/9) can be mistaken for a reading; 28/08/2026 cannot.
     if _valid(y, b, a):
         alt = (a, b) if _valid(y, a, b) and (a, b) != (b, a) else None
-        return [_Hit(start, end, "date", y, b, a, alt=alt)]
+        return [_Hit(start, end, "date", y, b, a, alt=alt, numeric=y is None)]
     if _valid(y, a, b):
-        return [_Hit(start, end, "date", y, a, b)]
+        return [_Hit(start, end, "date", y, a, b, numeric=y is None)]
     return []
 
 
 _SENTENCE_BREAK_RE = re.compile(r"[.!?。！？\n]")
 
 
-def _future_cued(text: str, start: int, end: int, window: int = 20) -> bool:
-    """A future cue within ``window`` chars, not crossing a sentence boundary."""
+def _future_cued(text: str, start: int, end: int, window: int = 32) -> bool:
+    """A future cue within ``window`` chars, not crossing a sentence boundary
+    ("I'm seeing the oncologist Monday" puts 22 chars between cue and weekday)."""
     before = text[max(0, start - window):start]
     breaks = list(_SENTENCE_BREAK_RE.finditer(before))
     if breaks:
@@ -361,7 +377,9 @@ def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | N
     spans: list[Span] = []
 
     for h in _find_dates(text, today):
-        if clinical_guarded(text, h.start, h.end):
+        # "The pain started on 5 August" is a date however close the word "pain" is;
+        # only numeric d/m forms can be mistaken for a reading (A6 guard).
+        if h.numeric and clinical_guarded(text, h.start, h.end):
             continue
         original = text[h.start:h.end]
         readings = [(h.m, h.d)] + ([h.alt] if h.alt else [])
