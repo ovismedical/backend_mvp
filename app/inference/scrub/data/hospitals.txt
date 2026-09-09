@@ -1,0 +1,255 @@
+# Hong Kong hospitals and well-known clinics — one entry per line, English and
+# Traditional Chinese in the same file. Matched as FACILITY. Latin entries are
+# case-insensitive whole-word matches; CJK entries are exact substrings.
+
+# --- Hospital Authority: Hong Kong East Cluster ---
+Pamela Youde Nethersole Eastern Hospital
+東區尤德夫人那打素醫院
+東區醫院
+Ruttonjee Hospital
+律敦治醫院
+Tang Shiu Kin Hospital
+鄧肇堅醫院
+St. John Hospital
+St John Hospital
+長洲醫院
+Tung Wah Eastern Hospital
+東華東院
+Wong Chuk Hang Hospital
+黃竹坑醫院
+Cheshire Home, Chung Hom Kok
+Cheshire Home Chung Hom Kok
+舂磡角慈氏護養院
+
+# --- Hospital Authority: Hong Kong West Cluster ---
+Queen Mary Hospital
+瑪麗醫院
+Grantham Hospital
+葛量洪醫院
+Tung Wah Hospital
+東華醫院
+Duchess of Kent Children's Hospital
+根德公爵夫人兒童醫院
+MacLehose Medical Rehabilitation Centre
+麥理浩復康院
+Fung Yiu King Hospital
+馮堯敬醫院
+Tsan Yuk Hospital
+贊育醫院
+
+# --- Hospital Authority: Kowloon Central Cluster ---
+Queen Elizabeth Hospital
+伊利沙伯醫院
+Kwong Wah Hospital
+廣華醫院
+Hong Kong Buddhist Hospital
+香港佛教醫院
+佛教醫院
+Hong Kong Eye Hospital
+香港眼科醫院
+Kowloon Hospital
+九龍醫院
+Our Lady of Maryknoll Hospital
+聖母醫院
+Wong Tai Sin Hospital
+黃大仙醫院
+Hong Kong Children's Hospital
+香港兒童醫院
+Hong Kong Red Cross Blood Transfusion Service
+香港紅十字會輸血服務中心
+
+# --- Hospital Authority: Kowloon East Cluster ---
+United Christian Hospital
+基督教聯合醫院
+聯合醫院
+Tseung Kwan O Hospital
+將軍澳醫院
+Haven of Hope Hospital
+靈實醫院
+
+# --- Hospital Authority: Kowloon West Cluster ---
+Princess Margaret Hospital
+瑪嘉烈醫院
+Caritas Medical Centre
+明愛醫院
+Kwai Chung Hospital
+葵涌醫院
+Yan Chai Hospital
+仁濟醫院
+North Lantau Hospital
+北大嶼山醫院
+
+# --- Hospital Authority: New Territories East Cluster ---
+Prince of Wales Hospital
+威爾斯親王醫院
+威爾斯醫院
+Alice Ho Miu Ling Nethersole Hospital
+雅麗氏何妙齡那打素醫院
+那打素醫院
+North District Hospital
+北區醫院
+Shatin Hospital
+Sha Tin Hospital
+沙田醫院
+Tai Po Hospital
+大埔醫院
+Bradbury Hospice
+白普理寧養中心
+Cheshire Home, Shatin
+Cheshire Home Shatin
+沙田慈氏護養院
+
+# --- Hospital Authority: New Territories West Cluster ---
+Tuen Mun Hospital
+屯門醫院
+Pok Oi Hospital
+博愛醫院
+Castle Peak Hospital
+青山醫院
+Siu Lam Hospital
+小欖醫院
+Tin Shui Wai Hospital
+天水圍醫院
+
+# --- Private hospitals ---
+Hong Kong Sanatorium & Hospital
+Hong Kong Sanatorium and Hospital
+Hong Kong Sanatorium
+養和醫院
+養和
+Hong Kong Adventist Hospital
+Hong Kong Adventist Hospital – Stubbs Road
+Hong Kong Adventist Hospital - Stubbs Road
+Adventist Hospital
+香港港安醫院
+港安醫院
+Hong Kong Adventist Hospital – Tsuen Wan
+Hong Kong Adventist Hospital - Tsuen Wan
+Tsuen Wan Adventist Hospital
+荃灣港安醫院
+Matilda International Hospital
+Matilda Hospital
+明德國際醫院
+明德醫院
+St. Teresa's Hospital
+St Teresa's Hospital
+St. Teresa Hospital
+聖德肋撒醫院
+法國醫院
+St. Paul's Hospital
+St Paul's Hospital
+聖保祿醫院
+Gleneagles Hospital Hong Kong
+Gleneagles Hospital
+港怡醫院
+Union Hospital
+仁安醫院
+Canossa Hospital
+嘉諾撒醫院
+Evangel Hospital
+播道醫院
+Precious Blood Hospital
+寶血醫院
+CUHK Medical Centre
+CUHK Medical Center
+Chinese University of Hong Kong Medical Centre
+中大醫院
+香港中文大學醫院
+Hong Kong Baptist Hospital
+Baptist Hospital
+香港浸信會醫院
+浸會醫院
+浸信會醫院
+Hong Kong Central Hospital
+港中醫院
+HKU-Shenzhen Hospital
+University of Hong Kong-Shenzhen Hospital
+港大深圳醫院
+香港大學深圳醫院
+
+# --- Well-known clinics and cancer centres ---
+Hong Kong Integrated Oncology Centre
+香港綜合腫瘤中心
+HKSH Cancer Centre
+養和癌症中心
+Prince of Wales Hospital Cancer Centre
+Queen Mary Hospital Cancer Centre
+Hong Kong Cancer Fund
+香港癌症基金會
+Tung Wah Group of Hospitals
+東華三院
+Sai Ying Pun Jockey Club Polyclinic
+西營盤賽馬會分科診所
+Yau Ma Tei Jockey Club Polyclinic
+油麻地賽馬會分科診所
+Kwun Tong Jockey Club Health Centre
+觀塘賽馬會健康院
+Shek Wu Hui Jockey Club Clinic
+石湖墟賽馬會診所
+Violet Peel General Outpatient Clinic
+貝夫人普通科門診診所
+Robert Black General Outpatient Clinic
+柏立基普通科門診診所
+Li Ka Shing Specialist Clinic
+李嘉誠專科診所
+Hong Kong Breast Cancer Foundation
+香港乳癌基金會
+
+# --- Everyday short forms and initialisms ---
+Queen Mary
+QMH
+Queen Elizabeth
+QEH
+Prince of Wales
+PWH
+Princess Margaret
+PMH
+Pamela Youde
+PYNEH
+United Christian
+UCH
+Tuen Mun Hospital
+TMH
+Kwong Wah
+KWH
+Caritas Medical
+CMC
+North District Hospital
+NDH
+TKOH
+Alice Ho Miu Ling
+AHNH
+Pok Oi
+POH
+TSWH
+Kwai Chung Hospital
+KCH
+Castle Peak
+CPH
+HKSH
+Sanatorium
+the Sanatorium
+Adventist
+Gleneagles
+Matilda
+Canossa
+Ruttonjee
+Grantham
+瑪麗
+伊利沙伯
+威爾斯
+瑪嘉烈
+律敦治
+葛量洪
+廣華
+明愛
+博愛
+仁濟
+仁安
+港安
+港怡
+聖保祿
+聖德肋撒
+嘉諾撒
+播道
+寶血
