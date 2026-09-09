@@ -75,7 +75,7 @@ FLORENCE_DAYS = {
 }
 QUESTIONNAIRE_DAYS = {1: False, 2: False, 3: True, 4: False, 5: False}  # days_ago -> bad_day
 RECORD_COLLECTIONS = ("answers", "florence_assessments", "symptom_questionnaires",
-                      "questionnaire_drafts", "user_achievements")
+                      "questionnaire_drafts", "user_achievements", "assessment_reviews")
 
 
 def seed_demo_account():

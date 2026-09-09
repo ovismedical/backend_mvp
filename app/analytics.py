@@ -21,6 +21,8 @@ def _florence_summary(doc):
         return "Florence is preparing the assessment…"
     if doc.get("triage_status") == "failed":
         return "Chat saved — automated assessment unavailable"
+    if doc.get("triage_status") == "pending_clinician_review":
+        return "Chat saved — awaiting clinician review"
     triage = doc.get("triage_assessment") or {}
     alert = doc.get("alert_level") or triage.get("alert_level")
     if alert in ("YELLOW", "ORANGE", "RED"):
@@ -168,7 +170,7 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
                     "ai_powered": conversation.get("ai_powered", False),
                     "conversation_length": message_count,
                     "session_id": conversation.get("session_id"),
-                    "alert_level": conversation.get("alert_level") if conversation.get("alert_level") != "PENDING" else None,
+                    "alert_level": conversation.get("alert_level") if conversation.get("alert_level") not in ("PENDING", "PENDING_REVIEW") else None,
                     "triage_status": conversation.get("triage_status"),
                     "oncologist_notification_level": oncologist_level,
                     "flag_for_oncologist": flag_for_oncologist

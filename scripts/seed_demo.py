@@ -213,7 +213,10 @@ def seed():
     db["hospitals"].delete_many({"code": HOSPITAL["code"]})
     db["doctors"].delete_many({"username": DOCTOR["username"]})
     db["users"].delete_many({"username": {"$in": usernames}})
-    for coll in ("answers", "florence_assessments", "symptom_questionnaires", "questionnaire_drafts", "user_achievements"):
+    # assessment_reviews are keyed by session_id, which this seed regenerates deterministically within a day,
+    # so rehearsal reviews would re-attach to the rebuilt records unless wiped with them.
+    for coll in ("answers", "florence_assessments", "symptom_questionnaires", "questionnaire_drafts", "user_achievements",
+                 "assessment_reviews"):
         db[coll].delete_many({"user_id": {"$in": usernames}})
 
     db["hospitals"].insert_one(dict(HOSPITAL))

@@ -223,3 +223,37 @@ def make_questionnaire_answers(overrides=None):
     if overrides:
         answers.update(overrides)
     return answers
+
+
+def make_pending_assessment_record(overrides=None):
+    """A florence_assessments document whose AI assessment was refused and awaits a clinician (Decision 3)."""
+    record = make_assessment_record({
+        "session_id": "testpatient_1710009999",
+        "structured_assessment": None,
+        "triage_assessment": None,
+        "alert_level": "PENDING_REVIEW",
+        "triage_status": "pending_clinician_review",
+        "refusal_reason": "dpa_not_confirmed",
+        "oncologist_notification_level": "none",
+        "flag_for_oncologist": False,
+    })
+    if overrides:
+        record.update(overrides)
+    return record
+
+
+def make_review(overrides=None):
+    """An assessment_reviews document: one clinician's verdict on one Florence assessment."""
+    review = {
+        "session_id": "testpatient_1710000000",
+        "user_id": "testpatient",
+        "doctor": "testdoctor",
+        "agrees": True,
+        "alert_level_override": None,
+        "note": None,
+        "florence_alert_level": "GREEN",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if overrides:
+        review.update(overrides)
+    return review

@@ -12,6 +12,8 @@ RELATED_COLLECTIONS = [
     "symptom_questionnaires",
     "questionnaire_drafts",
     "user_achievements",
+    "assessment_reviews",
+    "florence_sessions",
 ]
 
 

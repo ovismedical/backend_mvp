@@ -23,6 +23,7 @@ logger = logging.getLogger("ovis")
 from .login import get_db, get_client, get_user  # noqa: E402
 from .inference import get_gateway  # noqa: E402
 from .florence import ensure_session_index  # noqa: E402
+from .doctor import ensure_review_indexes  # noqa: E402
 
 
 def cors_origins() -> list[str]:
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
         logger.warning("no inference provider configured - Florence runs in fallback mode")
     try:
         ensure_session_index(get_db())
+        ensure_review_indexes(get_db())
     except Exception as e:
         logger.warning("could not prepare session indexes: %s", type(e).__name__)
     yield
@@ -116,4 +118,5 @@ async def configure_db(user=Depends(get_user), db=Depends(get_db)):
     db["auth_states"].create_index("expires_at", expireAfterSeconds=1)
     db["temp_users"].create_index("created_at", expireAfterSeconds=600)
     ensure_session_index(db)
+    ensure_review_indexes(db)
     return {"message": "Database indexes configured successfully"}

@@ -298,11 +298,6 @@ def generate_smart_insights(triage_data, structured_data):
     """Generate smart insights based on triage and structured assessment data"""
     insights = []
     
-    # Debug logging
-    print(f"🔍 Debug - triage_data type: {type(triage_data)}")
-    print(f"🔍 Debug - structured_data type: {type(structured_data)}")
-    print(f"🔍 Debug - structured_data keys: {structured_data.keys() if isinstance(structured_data, dict) else 'Not a dict'}")
-    
     # Analyze alert level
     alert_level = triage_data.get("alert_level") if isinstance(triage_data, dict) else None
     if alert_level == "GREEN":
@@ -331,9 +326,6 @@ def generate_smart_insights(triage_data, structured_data):
     symptoms = []
     if isinstance(structured_data, dict):
         symptoms_raw = structured_data.get("symptoms", [])
-        print(f"🔍 Debug - symptoms_raw type: {type(symptoms_raw)}")
-        print(f"🔍 Debug - symptoms_raw content: {symptoms_raw}")
-        
         if isinstance(symptoms_raw, list):
             symptoms = symptoms_raw
         elif isinstance(symptoms_raw, dict):
@@ -354,8 +346,6 @@ def generate_smart_insights(triage_data, structured_data):
                         "symptom": symptom_name,
                         "severity": "unknown"
                     })
-    
-    print(f"🔍 Debug - processed symptoms: {symptoms}")
     
     if symptoms:
         # Check for mood-sleep correlation

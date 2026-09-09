@@ -77,6 +77,29 @@ class TestUnifiedAssessments:
         body = (await client.get("/analytics/unified_assessments", headers=patient_headers)).json()
         assert body["total_assessments"] == 0
 
+    async def test_pending_clinician_review_is_not_an_alert_level(self, client, patient_headers, seeded_db):
+        doc = _florence_doc(days_ago=0)
+        doc.update({
+            "triage_status": "pending_clinician_review",
+            "alert_level": "PENDING_REVIEW",
+            "structured_assessment": None,
+            "triage_assessment": None,
+            "oncologist_notification_level": "none",
+            "flag_for_oncologist": False,
+        })
+        seeded_db["florence_assessments"].insert_one(doc)
+        seeded_db["florence_assessments"].insert_one(_florence_doc(days_ago=1, alert="PENDING") | {"triage_status": "generating"})
+
+        body = (await client.get("/analytics/unified_assessments", headers=patient_headers)).json()
+        pending, generating = body["assessments"]
+        assert pending["summary"] == "Chat saved — awaiting clinician review"
+        assert pending["data"]["alert_level"] is None
+        assert pending["data"]["triage_status"] == "pending_clinician_review"
+        assert pending["oncologist_notification_level"] == "none"
+        # the existing PENDING behaviour is unchanged
+        assert generating["data"]["alert_level"] is None
+        assert generating["summary"] == "Florence is preparing the assessment…"
+
 
 class TestAssessmentDetail:
 
