@@ -22,6 +22,11 @@ def _set_test_env(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key")
     monkeypatch.setenv("MONGODB_URI", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DB", "ovis-test")
+    # Routing policy: the compliance flag is on so openai-routed tasks run; refusal tests delenv it.
+    # Shell-level route/policy overrides must not leak into the suite.
+    monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
+    for var in ("INFERENCE_ROUTE_CHAT", "INFERENCE_ROUTE_ASSESSMENT", "INFERENCE_ROUTE_TRIAGE", "INFERENCE_POLICY_PATH"):
+        monkeypatch.delenv(var, raising=False)
     # login.py reads SECRET_KEY at import time — patch the module-level variable
     import app.login as login_mod
     monkeypatch.setattr(login_mod, "SECRET_KEY", "test-secret-key-for-testing-only")

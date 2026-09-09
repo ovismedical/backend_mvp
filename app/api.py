@@ -19,6 +19,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger("ovis")
+# Request paths carry usernames (session ids, /doctor/patient/{username}); keep them out of stdout.
+logging.getLogger("uvicorn.access").disabled = True
 
 from .login import get_db, get_client, get_user  # noqa: E402
 from .inference import get_gateway  # noqa: E402
@@ -94,7 +96,13 @@ async def health_check():
         health_status["database"] = "connected"
     except Exception:
         health_status["database"] = "disconnected"
-    health_status["florence_ai"] = "ready" if get_gateway().available() else "fallback"
+    gateway = get_gateway()
+    if not gateway.available():
+        health_status["florence_ai"] = "fallback"
+    elif gateway.decide("chat_turn", scrubbed=True).allow:
+        health_status["florence_ai"] = "ready"
+    else:
+        health_status["florence_ai"] = "refusing"  # providers exist but the routing policy refuses (e.g. dpa_ok=false)
     return health_status
 
 
