@@ -1,0 +1,358 @@
+# Well-known Hong Kong housing estates and residential developments — one entry
+# per line, English and Traditional Chinese. Matched as PLACE. Estates not listed
+# here are caught by the suffix rules (Estate/Court/Garden…, 邨/苑/花園/閣…).
+
+# --- Hong Kong Island ---
+Tai Koo Shing
+太古城
+Kornhill
+康怡花園
+Heng Fa Chuen
+杏花邨
+South Horizons
+海怡半島
+Wah Fu Estate
+華富邨
+Wah Kwai Estate
+華貴邨
+Chi Fu Fa Yuen
+置富花園
+Baguio Villa
+碧瑤灣
+Bel-Air
+Residence Bel-Air
+貝沙灣
+Lei Tung Estate
+利東邨
+Ap Lei Chau Estate
+鴨脷洲邨
+Shek Pai Wan Estate
+石排灣邨
+Siu Sai Wan Estate
+小西灣邨
+Hing Wah Estate
+興華邨
+Chai Wan Estate
+柴灣邨
+Oi Tung Estate
+愛東邨
+Hing Tung Estate
+興東邨
+Yiu Tung Estate
+耀東邨
+Model Housing Estate
+模範邨
+Healthy Village
+健康村
+Provident Centre
+和富中心
+Island Resort
+藍灣半島
+Grand Promenade
+嘉亨灣
+Lei King Wan
+鯊魚涌
+Robinson Place
+雍景臺
+Dynasty Court
+帝景園
+The Belcher's
+寶翠園
+Hongway Garden
+康威花園
+Ma Hang Estate
+馬坑邨
+Stanley Knoll
+Mount Parker Residences
+
+# --- Kowloon ---
+Whampoa Garden
+黃埔花園
+Laguna City
+麗港城
+Laguna Verde
+海逸豪園
+Mei Foo Sun Chuen
+美孚新邨
+Telford Gardens
+德福花園
+Amoy Gardens
+淘大花園
+Sceneway Garden
+匯景花園
+Lok Fu Estate
+樂富邨
+Wang Tau Hom Estate
+橫頭磡邨
+Choi Hung Estate
+彩虹邨
+Choi Wan Estate
+彩雲邨
+Shek Kip Mei Estate
+石硤尾邨
+Nam Shan Estate
+南山邨
+Pak Tin Estate
+白田邨
+Lai Kok Estate
+麗閣邨
+Un Chau Estate
+元州邨
+Lei Cheng Uk Estate
+李鄭屋邨
+So Uk Estate
+蘇屋邨
+Hoi Lai Estate
+海麗邨
+Fu Cheong Estate
+富昌邨
+Lower Ngau Tau Kok Estate
+牛頭角下邨
+Upper Ngau Tau Kok Estate
+牛頭角上邨
+Sau Mau Ping Estate
+秀茂坪邨
+Lam Tin Estate
+藍田邨
+Kai Tin Estate
+啟田邨
+Ping Tin Estate
+平田邨
+Tak Tin Estate
+德田邨
+Yau Tong Estate
+油塘邨
+Ko Cheung Court
+高翔苑
+Kwun Tong Garden Estate
+觀塘花園大廈
+Tsui Ping Estate
+翠屏邨
+Shun Lee Estate
+順利邨
+Shun Tin Estate
+順天邨
+Wo Lok Estate
+和樂邨
+Kai Yip Estate
+啟業邨
+Richland Gardens
+麗晶花園
+Ping Shek Estate
+坪石邨
+Tsz Wan Shan Estate
+慈雲山邨
+Tsz Lok Estate
+慈樂邨
+Fu Shan Estate
+富山邨
+Chuk Yuen Estate
+竹園邨
+Wong Tai Sin Estate
+黃大仙邨
+Tung Tau Estate
+東頭邨
+Ho Man Tin Estate
+何文田邨
+Oi Man Estate
+愛民邨
+Ma Tau Wai Estate
+馬頭圍邨
+Harbour Place
+海濱南岸
+Metro Harbour View
+港灣豪庭
+The Long Beach
+浪澄灣
+Olympian City
+奧海城
+Charming Garden
+富榮花園
+Prosperous Garden
+駿發花園
+Kowloon Bay Health Centre
+Kingsford Terrace
+嘉峰臺
+The Hermitage
+帝峯．皇殿
+
+# --- New Territories ---
+City One
+City One Shatin
+沙田第一城
+第一城
+Kingswood Villas
+嘉湖山莊
+Tin Shui Estate
+天水邨
+Tin Yiu Estate
+天耀邨
+Tin Chak Estate
+天澤邨
+Tin Heng Estate
+天恆邨
+Metro City
+新都城
+Park Central
+將軍澳中心
+The Wings
+天晉
+LOHAS Park
+日出康城
+Hau Tak Estate
+厚德邨
+Po Lam Estate
+寶林邨
+Tsui Lam Estate
+翠林邨
+King Lam Estate
+景林邨
+Ming Tak Estate
+明德邨
+Kin Ming Estate
+健明邨
+Belvedere Garden
+麗城花園
+Riviera Gardens
+海濱花園
+Tsuen Wan Centre
+荃灣中心
+Allway Gardens
+荃威花園
+Luk Yeung Sun Chuen
+綠楊新邨
+Discovery Park
+愉景新城
+Waterside Plaza
+碧堤半島
+Greenfield Garden
+翠怡花園
+Villa Esplanada
+灝景灣
+Tierra Verde
+盈翠半島
+Cheung Hong Estate
+長康邨
+Cheung Ching Estate
+長青邨
+Kwai Shing Estate
+葵盛邨
+Kwai Chung Estate
+葵涌邨
+Shek Yam Estate
+石蔭邨
+Lai Yiu Estate
+麗瑤邨
+Lai King Estate
+荔景邨
+Caribbean Coast
+映灣園
+Tung Chung Crescent
+東堤灣畔
+Coastal Skyline
+藍天海岸
+Yat Tung Estate
+逸東邨
+Fu Tung Estate
+富東邨
+Yoho Town
+YOHO Town
+Yoho Midtown
+新時代廣場
+Sun Yuen Long Centre
+新元朗中心
+Long Ping Estate
+朗屏邨
+Shui Pin Wai Estate
+水邊圍邨
+Tin Yan Estate
+天恩邨
+Butterfly Estate
+蝴蝶邨
+Tai Hing Estate
+大興邨
+Leung King Estate
+良景邨
+Shan King Estate
+山景邨
+Yau Oi Estate
+友愛邨
+On Ting Estate
+安定邨
+Siu Hong Court
+兆康苑
+Tuen Mun Town Plaza
+屯門市廣場
+Wo Che Estate
+禾輋邨
+Lek Yuen Estate
+瀝源邨
+Sun Chui Estate
+新翠邨
+Sun Tin Wai Estate
+新田圍邨
+Lung Hang Estate
+隆亨邨
+Mei Lam Estate
+美林邨
+Hin Keng Estate
+顯徑邨
+Heng On Estate
+恒安邨
+Yiu On Estate
+耀安邨
+Lee On Estate
+利安邨
+Kam Ying Court
+錦英苑
+Sunshine City
+新港城
+Ma On Shan Centre
+馬鞍山中心
+Royal Ascot
+駿景園
+Belair Gardens
+銀禧花園
+Tai Yuen Estate
+大元邨
+Fu Heng Estate
+富亨邨
+Kwong Fuk Estate
+廣福邨
+Tai Wo Estate
+太和邨
+Fu Shin Estate
+富善邨
+Wan Tau Tong Estate
+運頭塘邨
+Choi Yuen Estate
+彩園邨
+Tin Ping Estate
+天平邨
+Wah Ming Estate
+華明邨
+Fanling Centre
+粉嶺中心
+Cheung Wah Estate
+祥華邨
+Ka Fuk Estate
+嘉福邨
+Wah Sum Estate
+華心邨
+Sheung Shui Centre
+上水中心
+Uptown Plaza
+新達廣場
+Ocean Shores
+維景灣畔
+Festival City
+Double Cove
+迎海
+Lake Silver
+銀湖‧天峰
+Vision City
+萬景峯
+Nina Tower
+如心廣場
+The Riverpark
+溱岸8號

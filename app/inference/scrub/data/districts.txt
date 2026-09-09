@@ -1,0 +1,288 @@
+# Hong Kong districts and common areas — one entry per line, English and
+# Traditional Chinese. Matched as PLACE. Region-level names (Hong Kong, Kowloon,
+# New Territories) are deliberately absent: too coarse to identify anyone.
+# Single-word Latin entries that are also ordinary English words (Central,
+# Stanley, Jordan) are listed in common_words.txt and only match Capitalised
+# mid-sentence.
+
+# --- The 18 District Council districts ---
+Central and Western District
+Central and Western
+中西區
+Wan Chai District
+灣仔區
+Eastern District
+東區
+Southern District
+南區
+Yau Tsim Mong District
+Yau Tsim Mong
+油尖旺區
+油尖旺
+Sham Shui Po District
+深水埗區
+Kowloon City District
+九龍城區
+Wong Tai Sin District
+黃大仙區
+Kwun Tong District
+觀塘區
+Kwai Tsing District
+Kwai Tsing
+葵青區
+葵青
+Tsuen Wan District
+荃灣區
+Tuen Mun District
+屯門區
+Yuen Long District
+元朗區
+North District
+北區
+Tai Po District
+大埔區
+Sha Tin District
+沙田區
+Sai Kung District
+西貢區
+Islands District
+離島區
+離島
+
+# --- Hong Kong Island ---
+Central
+中環
+Sheung Wan
+上環
+Sai Ying Pun
+西營盤
+Sai Wan
+西環
+Kennedy Town
+堅尼地城
+Shek Tong Tsui
+石塘咀
+Mid-Levels
+Mid Levels
+半山
+The Peak
+Victoria Peak
+山頂
+Admiralty
+金鐘
+Wan Chai
+灣仔
+Causeway Bay
+銅鑼灣
+Happy Valley
+跑馬地
+Tin Hau
+天后
+Fortress Hill
+炮台山
+North Point
+北角
+Braemar Hill
+寶馬山
+Quarry Bay
+鰂魚涌
+Tai Koo
+太古
+Sai Wan Ho
+西灣河
+Shau Kei Wan
+筲箕灣
+Heng Fa Chuen
+杏花邨
+Chai Wan
+柴灣
+Siu Sai Wan
+小西灣
+Aberdeen
+香港仔
+Ap Lei Chau
+鴨脷洲
+Lei Tung
+利東
+Pok Fu Lam
+Pokfulam
+薄扶林
+Wong Chuk Hang
+黃竹坑
+Stanley
+赤柱
+Repulse Bay
+淺水灣
+Deep Water Bay
+深水灣
+Shek O
+石澳
+Tai Tam
+大潭
+Chung Hom Kok
+舂坎角
+Cyberport
+數碼港
+
+# --- Kowloon ---
+Tsim Sha Tsui
+尖沙咀
+Jordan
+佐敦
+Yau Ma Tei
+油麻地
+Mong Kok
+旺角
+Prince Edward
+太子
+Tai Kok Tsui
+大角咀
+Olympic City
+奧海城
+Sham Shui Po
+深水埗
+Cheung Sha Wan
+長沙灣
+Lai Chi Kok
+荔枝角
+Mei Foo
+美孚
+Shek Kip Mei
+石硤尾
+Kowloon Tong
+九龍塘
+Kowloon City
+九龍城
+Ho Man Tin
+何文田
+Hung Hom
+紅磡
+To Kwa Wan
+土瓜灣
+Ma Tau Wai
+馬頭圍
+Ma Tau Kok
+馬頭角
+Kai Tak
+啟德
+Wong Tai Sin
+黃大仙
+Lok Fu
+樂富
+Diamond Hill
+鑽石山
+Choi Hung
+彩虹
+Tsz Wan Shan
+慈雲山
+San Po Kong
+新蒲崗
+Ngau Chi Wan
+牛池灣
+Kwun Tong
+觀塘
+Ngau Tau Kok
+牛頭角
+Kowloon Bay
+九龍灣
+Lam Tin
+藍田
+Yau Tong
+油塘
+Sau Mau Ping
+秀茂坪
+Lei Yue Mun
+鯉魚門
+
+# --- New Territories ---
+Tseung Kwan O
+將軍澳
+Hang Hau
+坑口
+Po Lam
+寶琳
+Tiu Keng Leng
+調景嶺
+LOHAS Park
+Lohas Park
+日出康城
+Sai Kung
+西貢
+Clear Water Bay
+清水灣
+Sha Tin
+Shatin
+沙田
+Ma On Shan
+馬鞍山
+Tai Wai
+大圍
+Fo Tan
+火炭
+Wu Kai Sha
+烏溪沙
+Shek Mun
+石門
+Tai Po
+大埔
+Tai Po Market
+大埔墟
+Tai Wo
+太和
+Fanling
+粉嶺
+Sheung Shui
+上水
+Lo Wu
+羅湖
+Kwu Tung
+古洞
+Tuen Mun
+屯門
+Siu Hong
+兆康
+Yuen Long
+元朗
+Tin Shui Wai
+天水圍
+Kam Tin
+錦田
+Hung Shui Kiu
+洪水橋
+Lau Fau Shan
+流浮山
+Tsuen Wan
+荃灣
+Kwai Chung
+葵涌
+Kwai Fong
+葵芳
+Kwai Hing
+葵興
+Lai King
+荔景
+Tai Wo Hau
+大窩口
+Tsing Yi
+青衣
+Sham Tseng
+深井
+Ma Wan
+馬灣
+Tung Chung
+東涌
+Discovery Bay
+愉景灣
+Lantau Island
+Lantau
+大嶼山
+Cheung Chau
+長洲
+Peng Chau
+坪洲
+Lamma Island
+南丫島
+Mui Wo
+梅窩
+Tai O
+大澳

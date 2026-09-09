@@ -1,0 +1,43 @@
+# Honorifics. Latin titles precede a name ("Dr Chan", "Mrs Wong Tai Man");
+# CJK titles follow a surname (陳醫生, 李太太, 黃姑娘). One entry per line.
+# The short colloquial 生/太 (陳生, 陳太) are handled by a dedicated rule in
+# names.py with its own stoplist, not by this list.
+
+# --- Latin (precede the name) ---
+Dr
+Dr.
+Doctor
+Prof
+Prof.
+Professor
+Nurse
+Sister
+Mr
+Mr.
+Mrs
+Mrs.
+Ms
+Ms.
+Miss
+Madam
+Mdm
+Mdm.
+
+# --- CJK (follow the surname) ---
+醫生
+醫師
+教授
+護士
+姑娘
+先生
+太太
+小姐
+女士
+師奶
+師傅
+師父
+老師
+伯
+嬸
+叔
+姨

@@ -1,0 +1,383 @@
+# Occupations (bilingual). Only scrubbed when introduced with a self-description
+# cue ("I am a…", "I work as…", 我係…, 我做…). One entry per line.
+
+# --- Latin ---
+teacher
+school teacher
+primary school teacher
+secondary school teacher
+kindergarten teacher
+tutor
+lecturer
+professor
+principal
+headmaster
+headmistress
+nurse
+registered nurse
+doctor
+physician
+surgeon
+dentist
+pharmacist
+physiotherapist
+occupational therapist
+radiographer
+lab technician
+paramedic
+social worker
+counsellor
+counselor
+psychologist
+lawyer
+solicitor
+barrister
+accountant
+auditor
+banker
+bank teller
+financial advisor
+insurance agent
+property agent
+estate agent
+real estate agent
+engineer
+civil engineer
+electrical engineer
+architect
+surveyor
+draughtsman
+programmer
+software engineer
+software developer
+IT support
+IT technician
+designer
+graphic designer
+interior designer
+fashion designer
+journalist
+reporter
+editor
+writer
+photographer
+artist
+musician
+singer
+actor
+actress
+civil servant
+government clerk
+police officer
+policeman
+policewoman
+firefighter
+fireman
+customs officer
+immigration officer
+correctional officer
+soldier
+security guard
+watchman
+driver
+taxi driver
+bus driver
+minibus driver
+truck driver
+lorry driver
+delivery driver
+courier
+delivery worker
+postman
+cleaner
+janitor
+domestic helper
+housekeeper
+housewife
+homemaker
+carer
+caregiver
+cook
+chef
+waiter
+waitress
+bartender
+barista
+kitchen helper
+dim sum chef
+baker
+butcher
+fishmonger
+hawker
+shopkeeper
+shop assistant
+sales assistant
+salesperson
+salesman
+saleswoman
+cashier
+retail manager
+store manager
+manager
+office manager
+clerk
+office clerk
+receptionist
+secretary
+personal assistant
+administrator
+hairdresser
+hair stylist
+barber
+beautician
+manicurist
+masseur
+masseuse
+tailor
+seamstress
+dressmaker
+construction worker
+labourer
+laborer
+scaffolder
+bricklayer
+plasterer
+electrician
+plumber
+carpenter
+welder
+mechanic
+car mechanic
+air conditioning technician
+technician
+factory worker
+machine operator
+warehouse worker
+stock keeper
+dock worker
+seafarer
+sailor
+fisherman
+farmer
+gardener
+pilot
+flight attendant
+air hostess
+cabin crew
+ground staff
+tour guide
+travel agent
+hotel staff
+hotel receptionist
+concierge
+croupier
+dealer
+trader
+stockbroker
+broker
+merchant
+businessman
+businesswoman
+entrepreneur
+company director
+CEO
+consultant
+translator
+interpreter
+librarian
+researcher
+scientist
+priest
+pastor
+minister
+monk
+nun
+imam
+student
+university student
+retiree
+pensioner
+
+# --- CJK ---
+老師
+教師
+小學老師
+中學老師
+幼稚園老師
+補習老師
+講師
+教授
+校長
+護士
+姑娘
+醫生
+外科醫生
+牙醫
+藥劑師
+物理治療師
+職業治療師
+放射師
+化驗師
+救護員
+社工
+輔導員
+心理學家
+律師
+大律師
+會計
+會計師
+核數師
+銀行家
+銀行職員
+理財顧問
+保險經紀
+保險代理
+地產經紀
+地產代理
+工程師
+土木工程師
+電機工程師
+建築師
+測量師
+繪圖員
+程式員
+程式設計師
+軟件工程師
+IT
+資訊科技
+設計師
+平面設計師
+室內設計師
+時裝設計師
+記者
+編輯
+作家
+攝影師
+藝術家
+音樂家
+歌手
+演員
+公務員
+政府文員
+警察
+警員
+消防員
+海關
+海關人員
+入境處人員
+懲教人員
+軍人
+保安
+保安員
+看更
+司機
+的士司機
+巴士司機
+小巴司機
+貨車司機
+送貨司機
+速遞員
+送貨員
+郵差
+清潔工
+清潔工人
+家務助理
+管家
+家庭主婦
+主婦
+照顧者
+廚師
+廚房工
+樓面
+侍應
+侍應生
+酒保
+咖啡師
+點心師傅
+麵包師
+肉販
+魚販
+小販
+店主
+店員
+售貨員
+銷售員
+營業員
+收銀員
+經理
+店鋪經理
+辦公室經理
+文員
+辦公室文員
+接待員
+秘書
+私人助理
+行政人員
+髮型師
+理髮師
+美容師
+美甲師
+按摩師
+裁縫
+建築工人
+地盤工人
+地盤工
+搭棚工人
+泥水工
+水泥工
+電工
+水喉匠
+水喉工
+木匠
+燒焊工
+技工
+車房技工
+冷氣技工
+技術員
+工廠工人
+廠工
+機器操作員
+倉務員
+貨倉工人
+碼頭工人
+海員
+水手
+漁民
+漁夫
+農夫
+園丁
+花王
+機師
+飛機師
+空中服務員
+空姐
+空少
+地勤
+導遊
+旅行社職員
+酒店職員
+酒店接待
+荷官
+交易員
+股票經紀
+經紀
+商人
+生意人
+企業家
+公司董事
+顧問
+翻譯
+翻譯員
+傳譯員
+圖書館管理員
+研究員
+科學家
+神父
+牧師
+和尚
+僧人
+修女
+學生
+大學生
+退休人士
+退休
