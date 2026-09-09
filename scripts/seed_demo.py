@@ -63,10 +63,16 @@ def utc(days_ago: int, hour: int = 9, minute: int = 0) -> datetime:
     return base - timedelta(days=days_ago)
 
 
-def florence_record(username: str, created: datetime, baseline: float, in_remission: bool) -> dict:
+def florence_record(username: str, created: datetime, baseline: float, in_remission: bool,
+                    severities: dict | None = None) -> dict:
+    """One completed Florence session. Severities are drawn around `baseline` unless given explicitly
+    (a {symptom: 1..5} mapping), which lets a seed script script a specific day."""
     symptoms = {}
     for name in SYMPTOMS:
-        sev = max(1, min(5, round(rng.gauss(baseline, 0.9))))
+        if severities and name in severities:
+            sev = max(1, min(5, int(severities[name])))
+        else:
+            sev = max(1, min(5, round(rng.gauss(baseline, 0.9))))
         freq = max(1, min(5, sev + rng.choice([-1, 0, 0, 1])))
         symptoms[name] = {
             "frequency_rating": freq,
