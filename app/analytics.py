@@ -21,6 +21,13 @@ def _florence_summary(doc):
         return "Florence is preparing the assessment…"
     if doc.get("triage_status") == "failed":
         return "Chat saved — automated assessment unavailable"
+    triage = doc.get("triage_assessment") or {}
+    alert = doc.get("alert_level") or triage.get("alert_level")
+    if alert in ("YELLOW", "ORANGE", "RED"):
+        key = [k for k in (triage.get("key_symptoms") or []) if isinstance(k, str)][:3]
+        timeline = (triage.get("recommended_timeline") or "").split(".")[0].strip()
+        head = f"Triage {alert}" + (f" — {', '.join(key)}" if key else "")
+        return head + (f". {timeline}" if timeline and len(timeline) < 90 else "")
     symptoms = _structured_symptoms(doc)
     rated = []
     for name, data in symptoms.items():

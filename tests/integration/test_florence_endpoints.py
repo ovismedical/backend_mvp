@@ -171,6 +171,7 @@ class TestFinishSession:
 
     async def test_finishing_twice_returns_the_saved_result(self, client, patient_headers, mock_florence_ai):
         session_id = await self._start(client, patient_headers)
+        await client.post("/florence/send_message", json={"session_id": session_id, "message": "tired"}, headers=patient_headers)
         await client.post(f"/florence/finish_session/{session_id}", headers=patient_headers)
         await wait_for_background()
         again = await client.post(f"/florence/finish_session/{session_id}", headers=patient_headers)
@@ -178,6 +179,7 @@ class TestFinishSession:
 
     async def test_result_is_owner_only(self, client, patient_headers, doctor_headers, mock_florence_ai):
         session_id = await self._start(client, patient_headers)
+        await client.post("/florence/send_message", json={"session_id": session_id, "message": "tired"}, headers=patient_headers)
         await client.post(f"/florence/finish_session/{session_id}", headers=patient_headers)
         assert (await client.get(f"/florence/result/{session_id}", headers=doctor_headers)).status_code == 403
         assert (await client.get("/florence/result/nope", headers=patient_headers)).status_code == 404
@@ -195,6 +197,27 @@ class TestFinishSession:
         session_id = await self._start(client, patient_headers)
         response = await client.post(f"/florence/finish_session/{session_id}", headers=doctor_headers)
         assert response.status_code == 403
+
+
+class TestAbandonedSession:
+    """Ending a chat before the patient says anything must not create an assessment or an alert."""
+
+    async def test_no_patient_turns_means_no_record_and_no_triage(self, client, patient_headers, seeded_db, mock_florence_ai):
+        session_id = (await client.post("/florence/start_session", json={"language": "en"}, headers=patient_headers)).json()["session_id"]
+        resp = await client.post(f"/florence/finish_session/{session_id}", headers=patient_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["abandoned"] is True and body["triage_status"] == "skipped" and body["alert_level"] is None
+        await wait_for_background()
+        assert seeded_db["florence_assessments"].find_one({"session_id": session_id}) is None
+        assert seeded_db["florence_sessions"].find_one({"session_id": session_id})["status"] == "abandoned"
+        assert not [r for r in mock_florence_ai.requests if r.task in ("symptom_assessment", "triage")]
+        # polling an abandoned session is a clean "skipped", not a 404
+        result = (await client.get(f"/florence/result/{session_id}", headers=patient_headers)).json()
+        assert result["triage_status"] == "skipped" and result["abandoned"] is True
+        # and the doctor sees no alert from it
+        alerts = (await client.get("/doctor/alerts", headers=patient_headers)).status_code  # patient can't, sanity
+        assert alerts == 401
 
 
 class TestFallbackWithoutProvider:

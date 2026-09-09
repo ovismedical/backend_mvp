@@ -242,6 +242,25 @@ async def finish_florence_session(session_id: str, user: Dict = Depends(get_user
 
     completed_at = create_timestamp()
     session["completed_at"] = completed_at
+    history = session.get("conversation_history", [])
+    patient_turns = sum(1 for m in history if m.get("role") == "user")
+    if patient_turns == 0:
+        # Nothing was said: don't manufacture an assessment or a triage alert out of an empty chat.
+        _save_session(db, session, status="abandoned", completed_at=completed_at)
+        logger.info("session %s abandoned with no patient messages; nothing saved", session_id)
+        return {
+            "message": get_localized_message("session_completed", language),
+            "assessment_id": None,
+            "session_id": session_id,
+            "triage_status": "skipped",
+            "alert_level": None,
+            "alert_description": None,
+            "oncologist_notification_level": "none",
+            "structured_assessment": None,
+            "triage_assessment": None,
+            "ai_available": bool(session.get("ai_available")),
+            "abandoned": True,
+        }
     ai_available = bool(session.get("ai_available")) and get_gateway().available()
 
     record = create_assessment_record(session, None, None)
@@ -274,6 +293,11 @@ async def get_session_result(session_id: str, user: Dict = Depends(get_user), db
     """Poll for the background assessment/triage of a finished session."""
     record = db.florence_assessments.find_one({"session_id": session_id})
     if not record:
+        session = db[SESSIONS].find_one({"session_id": session_id})
+        if session and session.get("user_id") == user["username"] and session.get("status") == "abandoned":
+            return {"session_id": session_id, "triage_status": "skipped", "alert_level": None, "alert_description": None,
+                    "oncologist_notification_level": "none", "structured_assessment": None, "triage_assessment": None,
+                    "ai_available": bool(session.get("ai_available")), "abandoned": True}
         raise HTTPException(status_code=404, detail=get_localized_message("session_not_found"))
     if record.get("user_id") != user["username"]:
         raise HTTPException(status_code=403, detail=get_localized_message("access_denied"))

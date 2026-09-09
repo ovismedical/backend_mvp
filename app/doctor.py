@@ -62,15 +62,27 @@ def get_patients_details(doctor=Depends(get_user), db=Depends(get_db)):
             continue
         profile["_id"] = str(profile["_id"])
 
-        # Get latest assessment for alert_level
+        # Latest triaged assessment drives the alert level; any assessment or questionnaire drives "last activity"
         latest = assessments_coll.find_one(
             {"user_id": uname, "triage_assessment": {"$exists": True, "$ne": None}},
             sort=[("created_at", -1)],
         )
-        profile["latest_alert_level"] = (
-            (latest.get("triage_assessment") or {}).get("alert_level") if latest else None
-        )
-        profile["last_assessment_date"] = latest.get("created_at") if latest else None
+        any_assessment = assessments_coll.find_one({"user_id": uname}, {"created_at": 1, "oncologist_notification_level": 1},
+                                                   sort=[("created_at", -1)])
+        latest_q = db["symptom_questionnaires"].find_one({"user_id": uname}, {"timestamp": 1, "alert_level": 1},
+                                                          sort=[("submitted_at", -1)])
+        alert = (latest.get("triage_assessment") or {}).get("alert_level") if latest else None
+        if not alert and latest_q and latest_q.get("alert_level") not in (None, "UNKNOWN", "PENDING"):
+            alert = latest_q.get("alert_level")
+        if not alert and any_assessment:
+            alert = {"red": "RED", "amber": "YELLOW", "none": "GREEN"}.get(any_assessment.get("oncologist_notification_level"))
+        dates = [d for d in (
+            latest.get("created_at") if latest else None,
+            any_assessment.get("created_at") if any_assessment else None,
+            latest_q.get("timestamp") if latest_q else None,
+        ) if isinstance(d, str)]
+        profile["latest_alert_level"] = alert
+        profile["last_assessment_date"] = max(dates) if dates else None
         patients.append(profile)
 
     return {"patients": patients}

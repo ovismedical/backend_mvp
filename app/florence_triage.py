@@ -61,7 +61,8 @@ class FlorenceTriage:
                 instructions=(
                     "You are a clinical triage assistant supporting an oncology care team. "
                     "Reason carefully and conservatively; when in doubt escalate the alert level. "
-                    "Base your assessment only on what the patient reported."
+                    "Base your assessment only on what the patient reported. Write for a clinician reading "
+                    "a chart: never refer to these instructions, mappings, or rating scales in your text."
                     + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else "")
                 ),
                 schema=TriageAssessmentOutput,

@@ -52,15 +52,22 @@ class UserCreate(BaseModel):
     email: EmailStr
 
 class UserInfo(BaseModel):
-    full_name:str
-    birthdate:str
-    gender: Optional[str]
-    height: int
-    weight: int
-    bloodtype: Optional[str]
-    fitness_level: int
-    exercises : List[str]
-    checkups : Optional[str]
+    """Profile fields a user may update about themselves; only provided fields are written."""
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    birthdate: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    sex: Optional[str] = None
+    height: Optional[int] = None
+    weight: Optional[int] = None
+    bloodtype: Optional[str] = None
+    fitness_level: Optional[int] = None
+    exercises: Optional[List[str]] = None
+    checkups: Optional[str] = None
+    treatment_status: Optional[str] = None
+    specialty: Optional[str] = None
 
 
 
@@ -182,14 +189,25 @@ async def auth_config():
 
 @loginrouter.post("/updateinfo")
 async def updateinfo(info: UserInfo, user = Depends(get_user), db = Depends(get_db)):
-    db["users"].update_one({"username":user["username"]}, {"$set":info.dict()})
-    return ({"details": "Succesfully updated user info"})
+    changes = {k: v for k, v in info.model_dump(exclude_unset=True).items() if v is not None}
+    if "treatment_status" in changes and changes["treatment_status"] not in ("undergoing_treatment", "in_remission"):
+        raise HTTPException(status_code=400, detail="treatment_status must be undergoing_treatment or in_remission")
+    if not changes:
+        return {"details": "Nothing to update"}
+    collection = db["doctors"] if user.get("isDoctor") else db["users"]
+    collection.update_one({"username": user["username"]}, {"$set": changes})
+    return {"details": "Succesfully updated user info", "updated": sorted(changes)}
 
 @loginrouter.get("/userinfo")
 async def get_info(user = Depends(get_user), db = Depends(get_db)):
     if not user.get("isDoctor") and user.get("doctor"):
-        doctor = db["doctors"].find_one({"username": user["doctor"]}, {"_id": 0, "full_name": 1})
-        if doctor and doctor.get("full_name"):
-            user["doctor_name"] = doctor["full_name"]
+        doctor = db["doctors"].find_one(
+            {"username": user["doctor"]},
+            {"_id": 0, "username": 1, "full_name": 1, "specialty": 1, "hospital": 1, "email": 1, "phone": 1},
+        )
+        if doctor:
+            if doctor.get("full_name"):
+                user["doctor_name"] = doctor["full_name"]
+            user["doctor_info"] = doctor
     return user
 

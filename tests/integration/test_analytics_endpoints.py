@@ -68,7 +68,9 @@ class TestUnifiedAssessments:
         assert checkin["title"] == "Daily Symptom Check-in"
         assert "Appetite Loss" in checkin["summary"]
         assert checkin["oncologist_notification_level"] == "amber"  # flagged answers count as amber
-        assert body["assessments"][1]["summary"].startswith("Notable symptoms: Fatigue 4/5")
+        # flagged chats lead with the triage outcome rather than the raw symptom list
+        assert body["assessments"][1]["summary"].startswith("Triage YELLOW")
+        assert "Review this week" in body["assessments"][1]["summary"]
 
     async def test_other_users_data_is_invisible(self, client, patient_headers, seeded_db):
         seeded_db["florence_assessments"].insert_one(_florence_doc(user_id="someone_else"))
