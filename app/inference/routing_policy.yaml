@@ -7,8 +7,13 @@
 #     at decision time and is true only for "1", "true" or "yes";
 #   - `scrubbed` is satisfied only when the call site marked the request as
 #     de-identified (InferenceRequest.scrubbed=True).
-# Anything else is a refusal (InferenceRefused); the call site maps `on_refuse`
-# to user-visible behaviour. Changing this file changes what leaves the building.
+# Anything else is a refusal (InferenceRefused). `on_refuse` is informational: it
+# documents the behaviour each call site implements on refusal (chat_turn -> scripted
+# fallback reply; symptom_assessment/triage -> record saved as pending_clinician_review;
+# pii_detect -> skipped) and is surfaced via describe() and /health; changing it here does
+# NOT change that behaviour, which lives in app/florence.py and
+# app/questionnaire_triage_bridge.py. `provider` and `requires` are the fields that change
+# what leaves the building.
 version: 1
 
 flags:

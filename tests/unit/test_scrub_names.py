@@ -83,6 +83,95 @@ class TestKinship:
             assert rule_spans(t) == [], t
 
 
+class TestNameIntroductionCues:
+    """Finding: "X's name is", "Her name is", "She's called", "call me", "I go by", "my nickname is"
+    all introduced a name the scrubber then sent out in clear."""
+
+    @pytest.mark.parametrize("text,expected", [
+        ("My daughter's name is Ka Yan", "Ka Yan"),
+        ("my husband's name's Ka Ho", "Ka Ho"),
+        ("Her name is Ka Yan", "Ka Yan"),
+        ("His name was Ka Ho", "Ka Ho"),
+        ("My name is Grace Tam", "Grace Tam"),
+        ("She's called Wing Yan", "Wing Yan"),
+        ("he is named Chun Kit", "Chun Kit"),
+        ("People call me Gracie", "Gracie"),
+        ("Call me Tammy", "Tammy"),
+        ("I go by Gigi", "Gigi"),
+        ("My nickname is Ah Bo", "Ah Bo"),
+        ("my grandson little Timmy visited", "Timmy"),
+    ])
+    def test_intro_cue_yields_one_person_span_over_the_name(self, text, expected):
+        assert rule_spans(text) == [(expected, "PERSON")]
+
+    @pytest.mark.parametrize("text", [
+        "Call me tomorrow", "They call me every day", "I go by bus to Queen Mary Hospital",
+        "Her name is Monday", "my name is not important", "call me if it hurts",
+    ])
+    def test_intro_cue_traps(self, text):
+        assert [s for s in rule_spans(text) if s[1] == "PERSON"] == []
+
+    def test_own_name_resolves_to_the_patient_token(self):
+        ctx = ScrubContext(KnownIdentifiers(full_name="Grace Tam", username="demo"))
+        assert ctx.scrub("Call me Grace.", now=NOW).text == "Call me [PERSON_1]."
+        assert ctx.scrub("My name is Grace Tam", now=NOW).text == "My name is [PERSON_1]"
+        # A nickname that is not a variant of the known name gets its own token.
+        assert ctx.scrub("People call me Gracie", now=NOW).text == "People call me [PERSON_2]"
+
+
+class TestChineseNameIntroductionCues:
+
+    @pytest.mark.parametrize("text,expected", [
+        ("我個女個名叫美玲", "美玲"),
+        ("個女嘅名係美玲", "美玲"),
+        ("我老公個名叫志強", "志強"),
+        ("我個仔名字係家俊", "家俊"),
+        ("美玲係我個女", "美玲"),
+        ("志強係我老公", "志強"),
+        ("家俊就係我個仔", "家俊"),
+    ])
+    def test_forward_and_reversed_forms(self, text, expected):
+        assert rule_spans(text) == [(expected, "PERSON")]
+
+    @pytest.mark.parametrize("text", [
+        "我個女電話係91234567", "我個女個名好長", "我老公係好人", "醫生係我老公", "佢係我個女", "今日係我個仔生日",
+    ])
+    def test_traps(self, text):
+        assert [s for s in rule_spans(text) if s[1] == "PERSON"] == []
+
+    def test_name_learned_from_an_intro_sticks_across_turns(self):
+        ctx = ScrubContext(KnownIdentifiers(full_name="陳大文", username="chan123"))
+        assert ctx.scrub("我個女個名叫美玲", now=NOW).text == "我個女個名叫[PERSON_2]"
+        assert ctx.scrub("美玲今日嚟", now=NOW).text == "[PERSON_2]今日嚟"
+
+
+class TestThirdPartyNameParts:
+    """Finding: once a relative's full name is learned, its parts and 阿X form still leaked."""
+
+    def test_latin_parts_of_a_learned_name(self):
+        ctx = ScrubContext(PATIENT)
+        assert ctx.scrub("my daughter Mei Ling brought soup", now=NOW).text == "my daughter [PERSON_2] brought soup"
+        assert ctx.scrub("Ling came again", now=NOW).text == "[PERSON_2] came again"
+        assert ctx.scrub("Mei came too", now=NOW).text == "[PERSON_2] came too"
+
+    def test_learned_parts_do_not_eat_a_place(self):
+        ctx = ScrubContext(PATIENT)
+        ctx.scrub("my daughter Mei Ling brought soup", now=NOW)
+        assert ctx.scrub("Mei Foo is far", now=NOW).text == "[PLACE_1] is far"
+
+    def test_cjk_given_name_and_ah_form_of_a_learned_name(self):
+        ctx = ScrubContext(KnownIdentifiers(full_name="何小燕", username="u1"))
+        assert ctx.scrub("我老公陳志強送我", now=NOW).text == "我老公[PERSON_2]送我"
+        assert ctx.scrub("志強煮飯", now=NOW).text == "[PERSON_2]煮飯"
+        assert ctx.scrub("阿強好攰", now=NOW).text == "[PERSON_2]好攰"
+
+    def test_two_char_nickname_adds_no_variants(self):
+        ctx = ScrubContext(KnownIdentifiers(full_name="何小燕", username="u1"))
+        assert ctx.scrub("我個孫阿寶好乖", now=NOW).text == "我個孫[PERSON_2]好乖"
+        assert ctx.scrub("寶", now=NOW).text == "寶"          # no 1-char form derived
+        assert ctx.scrub("阿寶又嚟", now=NOW).text == "[PERSON_2]又嚟"
+
+
 class TestOccupations:
 
     def test_english_needs_self_description_cue(self):
@@ -130,6 +219,15 @@ class TestKnownCjkNames:
         assert scrub(k, "文件") == "文件"
         assert scrub(k, "陳文") == "[PERSON_1]"
         assert scrub(k, "阿文") == "[PERSON_1]"
+
+    def test_colloquial_old_and_big_brother_forms(self):
+        """Finding: 老陳 and 文哥 are how the patient is addressed, and both leaked."""
+        assert scrub(self.K, "老陳今日覆診") == "[PERSON_1]今日覆診"
+        assert scrub(self.K, "文哥你好") == "[PERSON_1]你好"
+
+    @pytest.mark.parametrize("text", ["老師話", "老婆煮飯", "老友嚟探我", "大哥話", "家姐照顧我", "小姐你好"])
+    def test_old_and_brother_forms_keep_everyday_words(self, text):
+        assert scrub(self.K, text) == text
 
     def test_compound_surname(self):
         k = KnownIdentifiers(full_name="歐陽志明", username="u1")

@@ -19,6 +19,9 @@ REVIEWS = "assessment_reviews"
 # A clinician sees records that have a completed triage OR are waiting for a clinician because the
 # AI assessment was refused. Records still generating / skipped / failed stay hidden, as before.
 # (Kept as a list of clauses so callers can splice it into an existing "$or"; MockCollection has no "$and".)
+# Records whose triage never produced a level: nothing about them is a clinical judgement.
+UNTRIAGED_STATUSES = ("generating", "skipped", "failed")
+
 VISIBLE_TRIAGE_CLAUSES = [
     {"triage_assessment": {"$exists": True, "$ne": None}},
     {"triage_status": PENDING_REVIEW_STATUS},
@@ -231,8 +234,11 @@ def get_patients_details(doctor=Depends(get_user), db=Depends(get_db)):
             {"conversation_history": 0},
             sort=[("created_at", -1)],
         )
-        any_assessment = assessments_coll.find_one({"user_id": uname}, {"created_at": 1, "oncologist_notification_level": 1},
-                                                   sort=[("created_at", -1)])
+        any_assessment = assessments_coll.find_one(
+            {"user_id": uname},
+            {"created_at": 1, "oncologist_notification_level": 1, "triage_status": 1},
+            sort=[("created_at", -1)],
+        )
         latest_q = db["symptom_questionnaires"].find_one({"user_id": uname}, {"timestamp": 1, "alert_level": 1},
                                                           sort=[("submitted_at", -1)])
         alert = None
@@ -247,7 +253,9 @@ def get_patients_details(doctor=Depends(get_user), db=Depends(get_db)):
                 }
         if not alert and latest_q and latest_q.get("alert_level") not in (None, "UNKNOWN", "PENDING"):
             alert = latest_q.get("alert_level")
-        if not alert and any_assessment:
+        if not alert and any_assessment and any_assessment.get("triage_status") not in UNTRIAGED_STATUSES:
+            # An untriaged record (generating / skipped / failed) carries no clinical judgement, so its
+            # oncologist_notification_level="none" must not be shown as GREEN. Null renders as "No Data".
             alert = {"red": "RED", "amber": "YELLOW", "none": "GREEN"}.get(any_assessment.get("oncologist_notification_level"))
         dates = [d for d in (
             latest.get("created_at") if latest else None,
@@ -348,12 +356,27 @@ def get_patient_assessment_detail(patient_id: str, session_id: str, doctor=Depen
 
 @doctorrouter.get("/patient/{patient_id}/questionnaires")
 def get_patient_questionnaires(patient_id: str, limit: int = 20, doctor=Depends(get_user), db=Depends(get_db)):
-    """List a patient's symptom questionnaire submissions."""
+    """List a patient's symptom questionnaire submissions, each with the clinician review of its triage.
+
+    A questionnaire whose triage was refused is saved as a pending florence_assessments record keyed
+    `questionnaire_<id>`; reviewing that record is what assigns the level. Without joining the reviews
+    back on, the Check-ins tab keeps showing the raw PENDING_REVIEW for ever.
+    """
     _require_doctor_owns_patient(doctor, patient_id)
 
     cursor = db["symptom_questionnaires"].find(
-        {"user_id": patient_id}, {"_id": 0}
+        {"user_id": patient_id}
     ).sort("submitted_at", -1).limit(limit)
 
     results = list(cursor)
+    for doc in results:
+        doc["session_id"] = f"questionnaire_{doc.get('_id')}"
+    attach_reviews(db, results, doctor=doctor["username"])
+    for doc in results:
+        override = (doc.get("review") or {}).get("alert_level_override")
+        if override:
+            # The clinician's level replaces the raw PENDING_REVIEW the bridge wrote; triage_status
+            # stays as it was so the UI can still say where the level came from.
+            doc["alert_level"] = override
+        doc.pop("_id", None)
     return {"questionnaires": results, "count": len(results)}

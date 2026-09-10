@@ -65,13 +65,18 @@ def messages_text(requests) -> str:
 
 class TestFlorenceTest:
 
-    async def test_florence_test_endpoint(self, client):
-        response = await client.get("/florence/test")
+    async def test_florence_test_endpoint(self, client, patient_headers):
+        response = await client.get("/florence/test", headers=patient_headers)
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "ok"
         assert "active_sessions" in body
         assert "policy" in body["inference"]
+
+    async def test_florence_test_requires_auth(self, client):
+        """Deployment/model names, per-provider health and the compliance flags are not public."""
+        response = await client.get("/florence/test")
+        assert response.status_code == 401
 
 
 class TestStartSession:
@@ -499,7 +504,7 @@ class TestRefusal:
     async def test_refused_opening_uses_the_session_language(self, client, patient_headers, refusing):
         body = await start(client, patient_headers, language="zh-HK")
         assert body["message"] == REFUSED_MESSAGES["zh-HK"]
-        assert body["message"] == generate_fallback_response("x", "refused", "zh-HK")
+        assert body["message"] == generate_fallback_response("refused", "zh-HK")
 
     async def test_pending_record_is_visible_to_the_doctor(self, client, patient_headers, doctor_headers, refusing):
         session_id = (await start(client, patient_headers))["session_id"]

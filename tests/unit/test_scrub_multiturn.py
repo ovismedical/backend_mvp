@@ -32,10 +32,21 @@ class TestSessionKnownLayer:
         ctx.scrub("my daughter Mei Ling", now=NOW)
         assert ctx.scrub_messages(first, now=NOW)[0]["content"] == "[PERSON_2] is coming"
 
-    def test_ages_and_dates_are_not_session_originals(self):
+    def test_dates_are_not_session_originals(self):
         ctx = ScrubContext(KNOWN)
-        ctx.scrub("I'm 59, it started 5 March", now=NOW)
-        assert ctx.scrub("59 tablets on March 5 shelf 59", now=NOW).text == "59 tablets on [DATE_1 · 188 days ago] shelf 59"
+        ctx.scrub("it started 5 March", now=NOW)
+        # A date original is re-generalised from scratch each turn, never re-matched as a literal.
+        assert ctx.scrub("5 tablets on March 5", now=NOW).text == "5 tablets on [DATE_1 · 188 days ago]"
+
+    def test_a_learned_age_is_re_matched_but_clinical_readings_are_not(self):
+        """The model echoes "[AGE · 50s]", the re-identifier turns it back into "59", and the patient
+        quotes it back: the bare number must not go out in clear on the next turn. A cued clinical
+        reading with the same digits still does (59 kg is not the patient's age)."""
+        ctx = ScrubContext(KNOWN)
+        assert ctx.scrub("I'm 59", now=NOW).text == "I'm [AGE · 50s]"
+        assert ctx.scrub("yes, 59, on shelf 59", now=NOW).text == "yes, [AGE · 50s], on shelf [AGE · 50s]"
+        assert ctx.scrub("59 kg and pulse 59", now=NOW).text == "59 kg and pulse 59"
+        assert "59" not in ctx.leak_forms()   # AGE stays out of the gateway leak check (E4)
 
     def test_cjk_session_originals_exact(self):
         ctx = ScrubContext(KnownIdentifiers(full_name="陳大文", username="chan123"))

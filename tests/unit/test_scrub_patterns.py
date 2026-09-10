@@ -22,6 +22,27 @@ class TestDirectIdentifiers:
         assert classes_for("CA-125 was 35", "ID") == []
         assert classes_for("HA12345678 no cue", "ID") == []
 
+    @pytest.mark.parametrize("text,expected", [
+        ("my hkid is a123456(7)", "a123456(7)"),          # lowercase
+        ("HKID A123456（7）", "A123456（7）"),              # fullwidth parentheses
+        ("身份證號碼：A123456（7）。", "A123456（7）"),
+        ("ID A123456 (7)", "A123456 (7)"),                # space before the bracket
+        ("A123456-7", "A123456-7"),                       # dash before the check digit
+        ("A123456/7", "A123456/7"),                       # slash before the check digit
+        ("HKID A123456 7", "A123456 7"),
+        ("hkid ab123456(a)", "ab123456(a)"),              # lowercase check letter
+    ])
+    def test_hkid_separator_and_case_variants(self, text, expected):
+        """Every one of these used to leave the six digits in clear."""
+        assert classes_for(text, "ID") == [expected]
+        assert "123456" not in text.replace(expected, "")
+
+    @pytest.mark.parametrize("text", [
+        "took 5 mg", "BP 120/80", "CA-125 is 123456", "pain 7/10", "2 tablets 3 times",
+    ])
+    def test_hkid_rule_leaves_clinical_numbers_alone(self, text):
+        assert classes_for(text, "ID") == []
+
     def test_phone_with_prefix_or_cue(self):
         assert classes_for("+852 9123 4567", "PHONE") == ["+852 9123 4567"]
         assert classes_for("call 9123 4567 day or night", "PHONE") == ["9123 4567"]
@@ -29,6 +50,15 @@ class TestDirectIdentifiers:
         assert classes_for("my number is 91234567", "PHONE") == ["91234567"]
         assert classes_for("電話 91234567", "PHONE") == ["91234567"]
         assert classes_for("致電 2123-4567", "PHONE") == ["2123-4567"]
+
+    def test_phone_cues_cover_the_everyday_verbs(self):
+        """"text", "ring", "SMS" and 搵 are how a patient actually hands over a number."""
+        assert classes_for("Text me 6234 5678", "PHONE") == ["6234 5678"]
+        assert classes_for("Ring me at 62345678", "PHONE") == ["62345678"]
+        assert classes_for("SMS me on 6234 5678", "PHONE") == ["6234 5678"]
+        assert classes_for("please message 9876 5432", "PHONE") == ["9876 5432"]
+        assert classes_for("搵我老公 5333 4444", "PHONE") == ["5333 4444"]
+        assert classes_for("有短訊 5333 4444", "PHONE") == ["5333 4444"]
 
     def test_bare_eight_digits_without_cue_untouched(self):
         assert classes_for("the code was 91234567 on the box", "PHONE") == []
@@ -91,6 +121,21 @@ class TestAddressesAndStreets:
         assert classes_for("she lives in Kornhill Gardens", "PLACE") == ["Kornhill Gardens"]
         assert classes_for("the road was long", "PLACE") == []
         assert classes_for("The Supreme Court ruled", "PLACE") == []
+
+    def test_abbreviated_street_types(self):
+        """"Rd", "Ave", "St." used to leave the whole address in clear."""
+        assert classes_for("I live at 12 Nathan Rd", "ADDRESS") == ["12 Nathan Rd"]
+        assert "5 Shing Yip St" in classes_for("5 Shing Yip St.", "ADDRESS")[0]
+        assert classes_for("88 Waterloo Ave, Kowloon", "ADDRESS") == ["88 Waterloo Ave"]
+        assert classes_for("work on Queen's Rd C", "PLACE") == ["Queen's Rd C"]
+        assert classes_for("Hennessy Rd", "PLACE") == ["Hennessy Rd"]
+
+    @pytest.mark.parametrize("text", [
+        "Dr Wong at St Paul's Hospital", "1st floor", "Take 2 tablets Dr said", "St Paul's is nearby",
+    ])
+    def test_ambiguous_abbreviations_need_a_house_number(self, text):
+        """"St"/"Dr"/"Ln" are only street words behind a house number, never on their own."""
+        assert classes_for(text, "PLACE") == [] and classes_for(text, "ADDRESS") == []
 
     def test_chinese_addresses(self):
         assert classes_for("我住喺太古城5座12樓A室", "ADDRESS") == ["太古城5座12樓A室"]

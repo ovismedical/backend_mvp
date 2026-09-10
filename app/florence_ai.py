@@ -16,21 +16,12 @@ from .florence_utils import (
     generate_fallback_response,
     handle_ai_response_error,
     load_florence_system_prompt,
+    task_metadata,
 )
 
 logger = logging.getLogger("ovis.florence")
 
 TASK_SOURCE = "florence"
-
-
-def _metadata(patient_ref: Optional[str], session_ref: Optional[str], task_source: str = TASK_SOURCE) -> Dict[str, Any]:
-    """Opaque transport/audit identifiers only - never names, usernames or session ids."""
-    meta: Dict[str, Any] = {"task_source": task_source}
-    if patient_ref:
-        meta["patient_ref"] = patient_ref
-    if session_ref:
-        meta["session_ref"] = session_ref
-    return meta
 
 
 class FlorenceAI:
@@ -74,7 +65,11 @@ class FlorenceAI:
         except InferenceRefused:
             raise
         except ProviderUnavailable:
-            return {"error": "AI not configured", "response": generate_fallback_response("there", "system_error")}
+            # No provider configured at all: the caller drops the session into fallback mode.
+            # A transient provider error takes the `handle_ai_response_error` path below instead,
+            # which has no `unavailable` flag, so the session stays AI-enabled and later turns retry.
+            return {"error": "AI not configured", "unavailable": True,
+                    "response": generate_fallback_response("system_error")}
         except Exception as e:
             return handle_ai_response_error(e, "start_conversation")
 
@@ -121,7 +116,7 @@ class FlorenceAI:
             language=language,
             effort="minimal",
             temperature=0.8,
-            metadata=_metadata(patient_ref, session_ref),
+            metadata=task_metadata(patient_ref, session_ref, TASK_SOURCE),
             scrubbed=True,
             known_identifiers=known_identifiers,
             scrub_report=scrub_report,

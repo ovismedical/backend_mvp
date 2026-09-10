@@ -209,7 +209,8 @@ class Health:
         if until is None:
             return True
         if self._clock() >= until:
-            # Cooldown over: let one call through. Failures are kept so a further failure re-trips at once.
+            # Cooldown over: close the breaker. The failure count is kept, so the next failure
+            # re-trips it at once.
             self._unhealthy_until.pop(provider, None)
             return True
         return False
@@ -261,11 +262,15 @@ class Router:
     def flag_value(self, name: str) -> bool:
         return self.policy.flag_value(name)
 
-    def warnings(self, effective_routes: Mapping[str, str | None]) -> list[str]:
+    def warnings(self, effective_routes: Mapping[str, str | None],
+                 providers: Iterable[str] | None = None) -> list[str]:
         """Operator-facing warnings about the current environment, e.g. a false flag that will refuse tasks.
 
         `effective_routes` maps task -> provider after overrides, so the warning names only providers
-        that a task actually routes to.
+        that a task actually routes to. `providers` is the gateway's registry of configured providers:
+        given it, a task routed at a provider that is not configured (or not declared in the policy) is
+        also reported, because every call to that task will refuse. Tasks whose `on_refuse` is "skip"
+        are left out — pii_detect is intentionally unconfigured in most deployments.
         """
         messages: list[str] = []
         routed = {p for p in effective_routes.values() if p}
@@ -278,4 +283,11 @@ class Router:
             )
             if affected:
                 messages.append(f"inference policy {flag_name}=false: {'/'.join(affected)}-routed tasks will refuse")
+        if providers is not None:
+            configured = set(providers)
+            for task, wanted in effective_routes.items():
+                if not wanted or self.policy.on_refuse_for(task) == "skip":
+                    continue
+                if wanted not in configured or wanted not in self.policy.providers:
+                    messages.append(f"inference route {task} -> {wanted} is not configured/declared; calls will refuse")
         return messages

@@ -10,6 +10,7 @@ re-identified before it is stored. A policy refusal or scrubber failure saves th
 questionnaire for clinician review instead of fabricating a triage.
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 
@@ -105,6 +106,21 @@ def _set_questionnaire_status(db, questionnaire_id: Any, fields: Dict[str, Any])
         logger.warning("questionnaire status update failed: %s", type(e).__name__)
 
 
+def _save_pending(db, session_data: Dict[str, Any], questionnaire_id: Any, qid: str, reason: str) -> None:
+    """Record a questionnaire whose triage did not happen as awaiting clinician review."""
+    try:
+        pending = create_assessment_record(session_data, None, None)
+        pending.update(pending_review_fields(reason))
+        pending["assessment_type"] = "questionnaire_triage"
+        pending["source_questionnaire_id"] = qid
+        db[ASSESSMENTS].insert_one(pending)
+    except Exception as e:  # noqa: BLE001 - never mask the outcome that got us here
+        logger.error("could not save pending questionnaire triage: %s", type(e).__name__)
+    _set_questionnaire_status(db, questionnaire_id, {
+        "triage_status": "pending_clinician_review", "alert_level": "PENDING_REVIEW",
+    })
+
+
 async def generate_questionnaire_triage(
     enriched: dict,
     questionnaire_id: Any,
@@ -168,18 +184,17 @@ async def generate_questionnaire_triage(
                 ctx, conversation_history, pref=pref, sref=sref, language=language,
                 treatment_status=treatment_status, task_source=TASK_SOURCE,
             )
+        except asyncio.CancelledError:
+            # Shutdown or deploy cancelled us mid-call: save the questionnaire for the clinician
+            # rather than leaving it with no triage at all.
+            logger.warning("questionnaire triage interrupted session_ref=%s; saved for clinician review", sref)
+            _save_pending(db, session_data, questionnaire_id, qid, "interrupted")
+            raise
         except (InferenceRefused, ScrubError) as e:
             reason = refusal_reason_for(e)
             logger.warning("questionnaire triage refused session_ref=%s: %s reason=%s; saved for clinician review",
                            sref, type(e).__name__, reason)
-            pending = create_assessment_record(session_data, None, None)
-            pending.update(pending_review_fields(reason))
-            pending["assessment_type"] = "questionnaire_triage"
-            pending["source_questionnaire_id"] = qid
-            db[ASSESSMENTS].insert_one(pending)
-            _set_questionnaire_status(db, questionnaire_id, {
-                "triage_status": "pending_clinician_review", "alert_level": "PENDING_REVIEW",
-            })
+            _save_pending(db, session_data, questionnaire_id, qid, reason)
             return
 
         assessment_record = create_assessment_record(session_data, structured_assessment, triage_assessment)

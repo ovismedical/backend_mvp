@@ -49,13 +49,15 @@ def _near(text: str, start: int, end: int, cue: re.Pattern, before: int = 20, af
 
 
 # --- direct identifiers ------------------------------------------------------------
-HKID_RE = re.compile(rf"{LB}[A-Z]{{1,2}}\d{{6}}\(?[0-9A]\)?{RB}")
+# Balanced ASCII or fullwidth parentheses (optional inner spaces), or a single optional
+# space/dash/slash before the check digit; lowercase letters are accepted.
+HKID_RE = re.compile(rf"{LB}[A-Za-z]{{1,2}}\d{{6}}(?:\s?[(（]\s?[0-9Aa]\s?[)）]|[\s\-/]?[0-9Aa]){RB}")
 
 # Any HK-shaped phone run; used by the known-identifier layer and leak_check too.
 PHONE_CANDIDATE_RE = re.compile(r"(?<!\d)(?:\(?\+?852\)?[\s\-()]*)?[2-9]\d{3}[\s\-.]?\d{4}(?!\d)")
 PHONE_CUE = _cue(
-    r"phone|tel|mobile|cell|number|contact|reach|call|whatsapp|hotline",
-    r"電話|手機|手提|聯絡|號碼|致電|打",
+    r"phone|tel|mobile|cell|number|contact|reach|call|ring|text|sms|message|msg|dial|buzz|page|whatsapp|hotline",
+    r"電話|手機|手提|聯絡|號碼|致電|打|搵|覆我|回覆|短訊|傳|留言",
 )
 
 EMAIL_RE = re.compile(rf"{LB}[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{{2,}}{RB}")
@@ -112,8 +114,13 @@ def _luhn(digits: str) -> bool:
 
 
 # --- addresses & streets (Latin) ------------------------------------------------------
-_STREET = r"(?:Road|Street|Avenue|Lane|Drive|Path|Terrace|Boulevard|Crescent|Square)"
-_STREET_TAIL = r"(?:\s+(?:Central|East|West|North|South))?"
+# Bare street rules (no house number) take only unambiguous abbreviations: "St", "Dr" and "Ln"
+# would turn "St Paul's Hospital" and "Dr Wong" into places.
+_STREET = r"(?:Road|Street|Avenue|Lane|Drive|Path|Terrace|Boulevard|Crescent|Square|Rd|Ave|Blvd|Cres)\.?"
+# The number-gated address rules can afford the ambiguous ones.
+_STREET_NUM = (r"(?:Road|Street|Avenue|Lane|Drive|Path|Terrace|Boulevard|Crescent|Square|Rd|Ave|Blvd|Cres|"
+               r"St|Dr|Ln)\.?")
+_STREET_TAIL = r"(?:\s+(?:Central|East|West|North|South|C|E|W|N|S)(?![A-Za-z]))?"
 _BUILDING = (r"(?:Estate|Court|Garden|Gardens|Mansion|Mansions|Building|House|Terrace|Villa|Villas|Tower|Towers|"
              r"Centre|Center|Plaza|Village|Shing|Chuen|Tsuen)")
 _FLOOR = r"(?:\d{1,3}/F|\d{1,3}(?:st|nd|rd|th)\s+[Ff]loor|[Ff]loor\s+\d{1,3}|G/F|Ground\s+[Ff]loor)"
@@ -124,7 +131,7 @@ ADDRESS_EN_RE = re.compile(
     (?:Flat|Unit|Room|Rm\.?|Apt\.?|Apartment|Suite)\s*[A-Za-z0-9]{{1,5}}
     (?:[,\s]+{_FLOOR})?
     (?:[,\s]+{_BLOCK})?
-    (?:[,\s]+(?:No\.?\s*)?\d{{1,4}}[A-Za-z]?(?:-\d{{1,4}})?\s+(?:{CAP}\s+){{1,4}}{_STREET}{_STREET_TAIL})?
+    (?:[,\s]+(?:No\.?\s*)?\d{{1,4}}[A-Za-z]?(?:-\d{{1,4}})?\s+(?:{CAP}\s+){{1,4}}{_STREET_NUM}{_STREET_TAIL})?
     (?:,\s*(?:(?:{CAP}\s+){{0,4}}{CAP}\s*{_BUILDING}|(?:{CAP}\s+){{1,4}}{CAP})(?![A-Za-z]))?
     """,
     re.X,
@@ -133,7 +140,7 @@ ADDRESS_FLOOR_RE = re.compile(
     rf"{LB}(?:{_FLOOR}|{_BLOCK})[,\s]+(?:{_BLOCK}[,\s]+)?{_FIRST}(?:{CAP}\s+){{1,4}}{_BUILDING}{RB}"
 )
 ADDRESS_STREET_RE = re.compile(
-    rf"{LB}(?:No\.?\s*)?\d{{1,4}}[A-Za-z]?(?:-\d{{1,4}})?\s+{_FIRST}(?:{CAP}\s+){{1,4}}{_STREET}{_STREET_TAIL}{RB}"
+    rf"{LB}(?:No\.?\s*)?\d{{1,4}}[A-Za-z]?(?:-\d{{1,4}})?\s+{_FIRST}(?:{CAP}\s+){{1,4}}{_STREET_NUM}{_STREET_TAIL}{RB}"
 )
 STREET_EN_RE = re.compile(rf"{LB}{_FIRST}(?:{CAP}\s+){{1,3}}{_STREET}{_STREET_TAIL}{RB}")
 ESTATE_EN_RE = re.compile(rf"{LB}{_FIRST}(?:{CAP}\s+){{1,4}}(?:Estate|Court|Gardens?|Mansions?|Villas?){RB}")

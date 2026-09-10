@@ -330,6 +330,9 @@ class TestScoring:
         assert "direct recall (bar >= 99%)" in text and "| PERSON | direct |" in text and "### Linkage-score histogram" in text
         payload = json.loads(js.read_text(encoding="utf-8"))
         assert payload["seed"] == gen.SEED and payload["runs"][0]["backend"] == "none"
+        # The report is written before it is committed, so a commit stamp could only name the parent
+        # tree - where these numbers are not reproducible. It is not written at all.
+        assert "commit" not in payload and "at commit" not in text
         run = payload["runs"][0]
         assert set(run["by_language"]) == {"en", "zh-HK"}
         assert run["overall"]["direct"]["recall"] >= DIRECT_BAR

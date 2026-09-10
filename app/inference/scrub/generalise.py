@@ -3,7 +3,8 @@
 - Absolute dates -> ``[DATE_n · k days ago]`` (``~N years ago`` beyond 730 days,
   ``in k days`` for upcoming ones, ``next <weekday>`` for future-cued weekdays,
   bare ``[DATE_n]`` only when ``now`` is unknown).
-- Any date whose (month, day) equals the patient's DOB -> ``[DOB]``.
+- Any date whose (month, day) equals the patient's DOB, or that a birth cue marks as a
+  birthday, -> ``[DOB]`` (never with an offset note).
 - Stated ages and birth years -> ``[AGE · 50s]`` (``90+`` collapsed).
 - Already-relative phrases (yesterday, 3 days ago, 上星期, 琴日) are untouched.
 
@@ -18,6 +19,7 @@ import calendar
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Iterable
 from zoneinfo import ZoneInfo
 
 from .patterns import PHONE_CUE
@@ -58,6 +60,25 @@ def clinical_guarded(text: str, start: int, end: int) -> bool:
     return bool(_CUE_BEFORE_ZH_RE.search(_before(text, start, 6)))
 
 
+# --- birth cue -------------------------------------------------------------------------
+# A date the patient volunteers as their birthday is a direct identifier even when the
+# profile has no DOB to compare it against: it becomes [DOB], never a dated offset.
+BIRTH_CUE_RE = re.compile(r"(?i:birth\s*day|born|d\.?o\.?b\.?|date\s+of\s+birth)|出世|出生|生日|生於|誕生")
+
+
+def _birth_cued(text: str, start: int, end: int) -> bool:
+    """A birth cue immediately around ``text[start:end]``, not across a sentence break."""
+    before = text[max(0, start - 30):start]
+    breaks = list(_GUARD_BREAK_RE.finditer(before))
+    if breaks:
+        before = before[breaks[-1].end():]
+    after = text[end:end + 8]
+    brk = _GUARD_BREAK_RE.search(after)
+    if brk:
+        after = after[:brk.start()]
+    return bool(BIRTH_CUE_RE.search(before) or BIRTH_CUE_RE.search(after))
+
+
 # --- vocab -----------------------------------------------------------------------------
 _MONTHS = {
     "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3, "apr": 4, "april": 4, "may": 5,
@@ -80,7 +101,7 @@ def zh_number(s: str) -> int | None:
     """Parse 五十九 / 十五 / 廿五 / 卅 / 一百 / 二零二四 (digit string)."""
     if not s:
         return None
-    if all(ch in _ZH_DIGITS for ch in s) and len(s) >= 3:   # 一九六六 -> 1966
+    if all(ch in _ZH_DIGITS for ch in s) and len(s) >= 2:   # 一九六六 -> 1966, 六六 -> 66
         return int("".join(str(_ZH_DIGITS[ch]) for ch in s))
     total, current = 0, 0
     for ch in s:
@@ -112,6 +133,9 @@ MDY_RE = re.compile(rf"{LB}({_MONTH_RE})\.?\s+{_D}(?:,?\s+(\d{{4}}))?{RB}", re.I
 # A trailing "." is a sentence end ("since 5/8.") unless a digit follows it (1.5/2.0).
 SLASH_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\d/]|\.\d)")
 DOT_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?!\d|\.\d)")
+# Year mandatory in both, so "pain 7-8", "120-80" and "I took 2 3 tablets" can never be dates.
+DASH_RE = re.compile(r"(?<![\d/.\-])(\d{1,2})-(\d{1,2})-(\d{4}|\d{2})(?!\d|\.\d)")
+SPACE_RE = re.compile(r"(?<![\d/.\-])(\d{1,2}) (\d{1,2}) (\d{4})(?!\d)")   # 4-digit year only
 ISO_RE = re.compile(r"(?<![\d])(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?![\d])")
 ZH_DATE_RE = re.compile(r"(?:(\d{4}|\d{2})\s*年\s*)?(\d{1,2})\s*月\s*(\d{1,2})\s*[日號]")
 ZH_DATE_NUM_RE = re.compile(r"(?:([一二三四五六七八九零〇]{2,4})年)?([一二三四五六七八九十]{1,2})月([一二三四五六七八九十廿卅]{1,3})[日號]")
@@ -141,6 +165,9 @@ AGE_ZH_RE = re.compile(r"(?<![\d])(\d{1,3}|[一二三四五六七八九十廿卅
 AGE_ZH_YEAR_RE = re.compile(r"(?:我|佢|他|她)?今年\s*(\d{1,3})(?![\d歲月日號年])")
 BIRTH_YEAR_RE = re.compile(
     r"(?i:born\s+(?:in\s+)?)(\d{4})(?![\d])|(?<![\d])(\d{4})\s*年\s*(?:出世|出生|生)(?![一-鿿]?日)|生於\s*(\d{4})(?![\d])"
+    # Two-digit and Chinese-numeral years, restricted to 出世/出生 (bare 生 would catch "3年生咗...").
+    r"|(?<![\d])(\d{2})\s*年\s*(?:出世|出生)(?!率)(?![一-鿿]?日)"
+    r"|([一二三四五六七八九零〇]{2}|[一二三四五六七八九零〇]{4})年\s*(?:出世|出生)(?!率)"
 )
 
 
@@ -255,6 +282,9 @@ def _find_dates(text: str, today: date | None) -> list[_Hit]:
         hits.extend(_numeric(m.start(), m.end(), a, b, y))
     for m in DOT_RE.finditer(text):
         hits.extend(_numeric(m.start(), m.end(), int(m.group(1)), int(m.group(2)), _year4(m.group(3), today)))
+    for rx in (DASH_RE, SPACE_RE):
+        for m in rx.finditer(text):
+            hits.extend(_numeric(m.start(), m.end(), int(m.group(1)), int(m.group(2)), _year4(m.group(3), today)))
     for m in ISO_RE.finditer(text):
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if _valid(y, mo, d):
@@ -283,6 +313,19 @@ def _numeric(start: int, end: int, a: int, b: int, y: int | None) -> list[_Hit]:
     if _valid(y, a, b):
         return [_Hit(start, end, "date", y, a, b, numeric=y is None)]
     return []
+
+
+def _dob_reading(readings, year, dob: date | None, known_md: set) -> tuple[int, int] | None:
+    """The (month, day) of this hit that is the patient's birthday, if any."""
+    if dob is not None and (year is None or year == dob.year):
+        for md in readings:
+            if md == (dob.month, dob.day):
+                return md
+    if known_md and year is None:   # learned in this session; no year to confirm against
+        for md in readings:
+            if md in known_md:
+                return md
+    return None
 
 
 _SENTENCE_BREAK_RE = re.compile(r"[.!?。！？\n]")
@@ -361,19 +404,29 @@ def _find_ages(text: str) -> list[_Hit]:
     return [h for h in hits if h.age is not None and 0 < h.age <= 120]
 
 
-def _find_birth_years(text: str) -> list[_Hit]:
+def _find_birth_years(text: str, today: date | None = None) -> list[_Hit]:
     hits: list[_Hit] = []
     for m in BIRTH_YEAR_RE.finditer(text):
-        g = next(i for i in (1, 2, 3) if m.group(i))
-        y = int(m.group(g))
-        if 1900 <= y <= 2100:
+        g = next(i for i in (1, 2, 3, 4, 5) if m.group(i))
+        raw = m.group(g)
+        if raw.isdigit():
+            y = _year4(raw, today) if len(raw) == 2 else int(raw)
+        else:
+            n = zh_number(raw)
+            y = _year4(f"{n:02d}", today) if n is not None and n < 100 else n
+        if y is not None and 1900 <= y <= 2100:
             hits.append(_Hit(m.start(g), m.end(g), "birth_year", y=y))
     return hits
 
 
 # --- the layer ------------------------------------------------------------------------------------
-def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | None = None) -> list[Span]:
+def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | None = None,
+                     dob_md: Iterable[tuple[int, int]] | None = None) -> list[Span]:
+    """``dob_md`` holds extra (month, day) pairs already known to be the patient's birthday —
+    the profile DOB plus any birthday volunteered earlier in the session — so an un-cued repeat
+    of the same date on a later turn is still [DOB] and not a dated offset."""
     today = _today(now, tz)
+    known_md = set(dob_md or ())
     spans: list[Span] = []
 
     for h in _find_dates(text, today):
@@ -383,8 +436,13 @@ def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | N
             continue
         original = text[h.start:h.end]
         readings = [(h.m, h.d)] + ([h.alt] if h.alt else [])
-        if dob is not None and any((mm, dd) == (dob.month, dob.day) for mm, dd in readings) and (h.y is None or h.y == dob.year):
-            spans.append(Span(h.start, h.end, DOB, PRIORITY_KNOWN, LAYER, key=original, token="[DOB]"))
+        matched = _dob_reading(readings, h.y, dob, known_md) or (
+            (h.m, h.d) if _birth_cued(text, h.start, h.end) else None
+        )
+        if matched is not None:
+            # No offset note: a birthday must never also say how long ago it was.
+            spans.append(Span(h.start, h.end, DOB, PRIORITY_KNOWN, LAYER, key=original, token="[DOB]",
+                              dedup=f"{matched[0]:02d}-{matched[1]:02d}"))
             continue
         note = dedup = None
         if today is not None:
@@ -421,7 +479,11 @@ def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | N
     for h in _find_days_zh(text):
         if clinical_guarded(text, h.start, h.end):
             continue
-        original = text[h.start:h.end]   # a bare 號 without a month is never treated as the DOB
+        original = text[h.start:h.end]
+        if _birth_cued(text, h.start, h.end):
+            # A bare 號 is only ever the DOB when a birth cue says so ("我生日係22號").
+            spans.append(Span(h.start, h.end, DOB, PRIORITY_KNOWN, LAYER, key=original, token="[DOB]"))
+            continue
         note = dedup = None
         if today is not None:
             resolved = _resolve_day_of_month(h.d, today, h.mode == "next")
@@ -438,7 +500,7 @@ def generalise_spans(text: str, *, now=None, tz: str = DEFAULT_TZ, dob: date | N
                           token=f"[AGE · {band}]", note=band))
 
     ref_year = (today or date.today()).year
-    for h in _find_birth_years(text):
+    for h in _find_birth_years(text, today):
         age = ref_year - h.y
         if 0 <= age <= 120:
             band = age_band(age)
@@ -469,5 +531,6 @@ def _resolve_day_of_month(day: int, today: date, future: bool) -> date | None:
 
 
 __all__ = [
-    "DEFAULT_TZ", "LAYER", "age_band", "clinical_guarded", "generalise_spans", "offset_note", "zh_number",
+    "BIRTH_CUE_RE", "DEFAULT_TZ", "LAYER", "age_band", "clinical_guarded", "generalise_spans", "offset_note",
+    "zh_number",
 ]

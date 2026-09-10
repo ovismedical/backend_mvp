@@ -6,8 +6,8 @@ PHI recall run is part of the default suite because it finishes in about a secon
 
 ```
 .venv/bin/python -m pytest -q tests/eval                                  # the bars (default suite)
-.venv/bin/python -m tests.eval.phi_recall.run_phi_eval                    # regenerate docs/eval-phi-recall.{md,json}
-.venv/bin/python -m tests.eval.phi_recall.run_phi_eval --backend none --backend presidio
+.venv/bin/python -m tests.eval.phi_recall.run_phi_eval --backend none --backend presidio   # regenerate docs/eval-phi-recall.{md,json}
+.venv/bin/python -m tests.eval.phi_recall.run_phi_eval                    # one run only: overwrites the report without the NER table
 .venv/bin/python -m pytest -q -m "not eval"                               # skip them
 ```
 

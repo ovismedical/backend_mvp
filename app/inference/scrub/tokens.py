@@ -36,6 +36,10 @@ UNINDEXED = frozenset({AGE, DOB})
 LINKAGE_CLASSES = frozenset({FACILITY, PLACE, ADDRESS, ORG, OCCUPATION, DATE, AGE})
 # Classes never re-matched from the session TokenMap (their originals are not identities).
 SESSION_EXCLUDED = frozenset({AGE, DATE, DOB})
+# Classes kept out of the gateway leak check. An OCCUPATION original is a generalisation, not an
+# identity, and collides with words in the static prompt templates (醫生, 翻譯), which would refuse
+# every assessment of a session where the patient mentioned their job.
+LEAK_EXCLUDED = SESSION_EXCLUDED | {OCCUPATION}
 
 # --- layer priorities (higher wins on an equal-length overlap) ----------------
 PRIORITY_KNOWN = 100
@@ -227,6 +231,10 @@ class TokenMap:
     def class_of(self, token: str) -> str | None:
         return self._classes.get(token)
 
+    def dedup_for(self, token: str) -> str | None:
+        """The explicit dedup key stored with ``token`` (dates/DOB), if any."""
+        return self._dedup.get(token)
+
     def items(self) -> Iterable[tuple[str, str]]:
         return list(self._tokens.items())
 
@@ -290,7 +298,7 @@ def token_surface(token: str, note: str | None) -> str:
 
 __all__ = [
     "ADDRESS", "AGE", "ALL_CLASSES", "CLASSES", "DATE", "DOB", "EMAIL", "FACILITY", "HANDLE", "ID",
-    "LINKAGE_CLASSES", "OCCUPATION", "ORG", "PERSON", "PHONE", "PLACE", "URL", "UNINDEXED",
+    "LEAK_EXCLUDED", "LINKAGE_CLASSES", "OCCUPATION", "ORG", "PERSON", "PHONE", "PLACE", "URL", "UNINDEXED",
     "SESSION_EXCLUDED", "PRIORITY_GAZETTEER", "PRIORITY_GENERALISE", "PRIORITY_KNOWN", "PRIORITY_NAMES",
     "PRIORITY_NER", "PRIORITY_PATTERNS", "ScrubError", "Span", "TokenMap", "LB", "RB", "LATIN_WORD",
     "has_cjk", "is_cjk", "normalise_key", "normalise_phone", "digits_only", "flexible_literal",

@@ -10,8 +10,9 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from .inference import InferenceRefused, InferenceRequest, get_gateway
-from .florence_assessment import load_prompt_template, status_label, task_metadata
-from .florence_utils import TriageAssessmentOutput, create_timestamp, model_messages
+from .florence_utils import (
+    TriageAssessmentOutput, create_timestamp, load_prompt_template, model_messages, status_label, task_metadata,
+)
 
 logger = logging.getLogger("ovis.florence")
 
@@ -86,6 +87,7 @@ class FlorenceTriage:
                 scrubbed=True,
                 known_identifiers=known_identifiers,
                 scrub_report=scrub_report,
+                trusted_tail=1,   # the appended turn is the static prompt template, not transcript
             ))
 
             triage = result.parsed.model_dump()

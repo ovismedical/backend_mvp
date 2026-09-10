@@ -3,10 +3,11 @@ FastAPI Application Setup
 App configuration, middleware, and router registration.
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,8 @@ logging.getLogger("uvicorn.access").disabled = True
 from .login import get_db, get_client, get_user  # noqa: E402
 from .inference import get_gateway  # noqa: E402
 from .inference.audit import MongoAuditSink, ensure_audit_indexes  # noqa: E402
-from .florence import ensure_session_index  # noqa: E402
+from .florence import ensure_session_index, wait_for_background  # noqa: E402
+from .florence_utils import pending_review_fields  # noqa: E402
 from .doctor import ensure_review_indexes  # noqa: E402
 
 
@@ -36,6 +38,30 @@ def cors_origins() -> list[str]:
         logger.warning("CORS_ORIGINS not set - allowing all origins")
         return ["*"]
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+# A background analysis cannot outlive its process, so anything still "generating" when we start
+# belongs to a process that was killed (SIGKILL, OOM, redeploy). Left alone the record is invisible
+# to the clinician and "still processing" to the patient for ever.
+ORPHAN_ANALYSIS_AGE = timedelta(minutes=10)
+SHUTDOWN_GRACE_S = 60
+
+
+def sweep_interrupted_analyses(db, *, now=None) -> int:
+    """Move analyses orphaned by a previous process to pending_clinician_review. Best effort."""
+    cutoff = ((now or datetime.now(timezone.utc)) - ORPHAN_ANALYSIS_AGE).isoformat()
+    try:
+        result = db["florence_assessments"].update_many(
+            {"triage_status": "generating", "created_at": {"$lt": cutoff}},
+            {"$set": pending_review_fields("interrupted")},
+        )
+        swept = int(getattr(result, "modified_count", 0) or 0)
+    except Exception as e:  # noqa: BLE001 - a startup sweep must never stop the app booting
+        logger.warning("could not sweep interrupted analyses: %s", type(e).__name__)
+        return 0
+    if swept:
+        logger.warning("%d interrupted analyses moved to clinician review", swept)
+    return swept
 
 
 def configure_gateway_audit(db) -> None:
@@ -58,9 +84,15 @@ async def lifespan(app: FastAPI):
         ensure_review_indexes(db)
         ensure_audit_indexes(db)
         configure_gateway_audit(db)
+        sweep_interrupted_analyses(db)
     except Exception as e:
         logger.warning("could not prepare database indexes or the audit sink: %s", type(e).__name__)
     yield
+    try:
+        # Let in-flight analyses finish on a graceful SIGTERM rather than being cancelled mid-call.
+        await asyncio.wait_for(wait_for_background(), timeout=SHUTDOWN_GRACE_S)
+    except Exception as e:  # noqa: BLE001 - includes TimeoutError; shutdown must not raise
+        logger.warning("background analyses did not finish before shutdown: %s", type(e).__name__)
 
 
 app = FastAPI(

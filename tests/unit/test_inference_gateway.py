@@ -329,6 +329,19 @@ class TestPolicyGate:
         gw = InferenceGateway({"local": FakeProvider(name="local")}, routes={t: "local" for t in TASKS})
         assert gw.policy_warnings() == []
 
+    def test_warning_when_a_route_names_an_unconfigured_provider(self, monkeypatch):
+        """Every call to a task routed at a provider that does not exist refuses; say so at startup."""
+        monkeypatch.setenv("INFERENCE_ROUTE_CHAT", "ollama")
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+        assert gw.policy_warnings() == [
+            "inference route chat_turn -> ollama is not configured/declared; calls will refuse"
+        ]
+
+    def test_no_warning_for_the_unconfigured_skip_task(self):
+        """pii_detect routes at `local` in most deployments and its on_refuse is "skip"."""
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+        assert gw.policy_warnings() == []
+
 
 class TestBreaker:
 
@@ -418,14 +431,15 @@ class TestLeakCheck:
         await gw.complete(req(known_identifiers=[]))
         assert fake_scrub == []
 
-    async def test_missing_scrub_package_warns_and_allows(self, monkeypatch, caplog):
+    async def test_missing_scrub_package_fails_closed(self, monkeypatch, caplog):
+        """An unverifiable request does not leave the building, like every other leak-check failure."""
         monkeypatch.setitem(sys.modules, "app.inference.scrub", None)  # forces ImportError on the lazy import
         openai = FakeProvider(name="openai")
         gw = InferenceGateway({"openai": openai})
-        with caplog.at_level(logging.WARNING, logger="ovis.inference"):
-            result = await gw.complete(req(known_identifiers=["Grace Tam"]))
-        assert result.provider == "openai"
-        assert "leak check skipped" in caplog.text and "Grace" not in caplog.text
+        with caplog.at_level(logging.WARNING, logger="ovis.inference"), pytest.raises(InferenceRefused) as exc:
+            await gw.complete(req(known_identifiers=["Grace Tam"]))
+        assert exc.value.reason == "leak_check_failed" and openai.requests == []
+        assert "leak check unavailable" in caplog.text and "Grace" not in caplog.text
 
     async def test_leak_check_exception_fails_closed(self, monkeypatch, caplog):
         def exploding(messages, known):
@@ -440,6 +454,35 @@ class TestLeakCheck:
         assert exc.value.reason == "leak_check_failed" and openai.requests == []
         assert "leak check raised ValueError" in caplog.text
         assert "A123456" not in caplog.text and "1966" not in caplog.text and "Grace" not in caplog.text
+
+    async def test_trusted_tail_is_exempt_from_the_leak_check(self, fake_scrub):
+        """The appended prompt template is static call-site text: an identifier that collides with a
+        template word (醫生, 翻譯) must not refuse the call, while the transcript is still checked."""
+        openai = FakeProvider(name="openai")
+        gw = InferenceGateway({"openai": openai})
+        template = {"role": "user", "content": "Summarise the conversation for the 醫生 on duty."}
+        assert (await gw.complete(InferenceRequest(
+            task="chat_turn", messages=[{"role": "user", "content": "I feel tired"}, template],
+            scrubbed=True, known_identifiers=["醫生"], trusted_tail=1,
+        ))).provider == "openai"
+        assert fake_scrub[-1][0] == [{"role": "user", "content": "I feel tired"}]  # template not checked
+
+        with pytest.raises(InferenceRefused) as exc:
+            await gw.complete(InferenceRequest(
+                task="chat_turn", messages=[{"role": "user", "content": "my 醫生 said so"}, template],
+                scrubbed=True, known_identifiers=["醫生"], trusted_tail=1,
+            ))
+        assert exc.value.reason == "leak_check_failed"
+
+    async def test_trusted_tail_is_clamped_and_only_trusts_the_tail(self, fake_scrub):
+        """A negative tail cannot shrink the checked slice; an oversized one cannot index past it.
+        Only a call site that sends nothing but its own static template ends up checking nothing."""
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+        with pytest.raises(InferenceRefused):
+            await gw.complete(req(known_identifiers=["hi"], trusted_tail=-3))   # clamped to 0: full check
+        assert fake_scrub[-1][0] == [{"role": "user", "content": "hi"}]
+        await gw.complete(req(known_identifiers=["hi"], trusted_tail=9))        # clamped to len(messages)
+        assert fake_scrub[-1][0] == []
 
     async def test_refused_requests_are_not_leak_checked(self, fake_scrub):
         gw = InferenceGateway({"openai": FakeProvider(name="openai")})
@@ -464,7 +507,8 @@ class TestAuditSink:
         event = sink.events[0].to_dict()
         assert event["kind"] == "inference" and event["decision"] == "allow" and event["reason"] == "ok"
         assert event["outcome"] == "ok" and event["task"] == "triage" and event["provider"] == "openai"
-        assert event["model"] == "gpt-5-mini" and event["lang"] == "zh" and event["msgs"] == 1
+        # `language` is audited only as one of the supported values, never raw call-site text.
+        assert event["model"] == "gpt-5-mini" and event["lang"] == "other" and event["msgs"] == 1
         assert event["patient_ref"] == "p" * 16 and event["session_ref"] == "s" * 12 and event["task_source"] == "florence"
         assert event["scrub"] == {"counts": {"PERSON": 1}, "linkage_score": 2, "ner_backend": "none"}
         assert isinstance(event["latency_ms"], int) and event["ts"] is not None
@@ -501,6 +545,28 @@ class TestAuditSink:
         gw = InferenceGateway({"openai": FakeProvider(name="openai")})
         result = await gw.complete(req())
         assert result.audit_id is None
+
+
+class TestAuditLanguage:
+
+    async def test_unsupported_language_is_audited_as_other_and_never_logged(self, caplog):
+        """`language` reaches the audit document and the log line, so free text (and newlines
+        that would forge a second log record) never pass through raw."""
+        sink = RecordingSink()
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, audit_sink=sink)
+        forged = "en\nWARNING ovis.inference: patient Grace Tam HKID A123456(7)"
+        with caplog.at_level(logging.INFO, logger="ovis.inference"):
+            await gw.complete(req(language=forged))
+        assert sink.events[0].to_dict()["lang"] == "other"
+        assert "Grace" not in caplog.text and "A123456" not in caplog.text
+        assert "lang=other" in caplog.text
+        assert all("\n" not in record.getMessage() for record in caplog.records)
+
+    async def test_supported_languages_are_audited_verbatim(self):
+        sink = RecordingSink()
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, audit_sink=sink)
+        await gw.complete(req(language="zh-HK"))
+        assert sink.events[0].to_dict()["lang"] == "zh-HK"
 
 
 class TestDescribe:

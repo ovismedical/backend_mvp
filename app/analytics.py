@@ -188,6 +188,8 @@ async def get_unified_assessments(user = Depends(get_user), db = Depends(get_db)
             summary = questionnaire.get("clinical_summary") or {}
             completion = questionnaire.get("completion") or {}
             alert_level = questionnaire.get("alert_level")
+            if alert_level in ("PENDING", "PENDING_REVIEW"):
+                alert_level = None   # awaiting clinician review; `triage_status` carries that state
             oncologist_level = "none"
             if alert_level in ("RED", "ORANGE"):
                 oncologist_level = "red" if alert_level == "RED" else "amber"

@@ -17,7 +17,7 @@ from .gazetteers import (
     common_words, compound_surnames_zh, kinship_words, kinship_zh_with_ah, occupations, single_surnames_zh,
     split_scripts, titles,
 )
-from .generalise import age_band
+from .generalise import age_band, clinical_guarded
 from .patterns import ZH_STOP
 from .tokens import (
     AGE, EMAIL, FACILITY, ID, LB, OCCUPATION, PERSON, PHONE, PRIORITY_KNOWN, PRIORITY_NAMES, RB,
@@ -101,6 +101,8 @@ class KnownIdentifiers:
         return [
             d.strftime("%m/%d/%Y"), d.strftime("%d/%m/%Y"), d.isoformat(),
             f"{d.day}/{d.month}/{d.year}", d.strftime("%Y/%m/%d"), str(d.year),
+            # Hyphen forms so the gateway leak check backs the generaliser's DASH_RE (A9).
+            d.strftime("%d-%m-%Y"), f"{d.day}-{d.month}-{d.year}", d.strftime("%d-%m-%y"),
         ]
 
     def leak_forms(self) -> list[str]:
@@ -163,6 +165,56 @@ def _latin_name_forms(name: str | None, *, unconditional_only: bool) -> list[str
     return forms
 
 
+def _person_forms(name: str | None, *, cjk_suffixes: bool) -> list[tuple[re.Pattern, bool]]:
+    """(regex, conditional) for every surface that names this person.
+
+    One derivation shared by the known layer and the session-known layer so the two cannot
+    drift (A0/A2/A3): the whole name, its two-token romanisations, its >=3-char parts (a part
+    that is also a common word only counts Capitalised and not sentence-initial) and, for CJK,
+    the given name plus the 阿X form. ``cjk_suffixes`` adds the patient's own colloquial
+    surname variants (陳生, 陳太, 老陳...); relatives learned mid-session do not get them —
+    they usually share the patient's surname and would compete with [PERSON_1].
+    """
+    raw = (name or "").strip()
+    if not raw:
+        return []
+    if has_cjk(raw):
+        if cjk_suffixes:
+            return [(re.compile(re.escape(v)), False) for v in cjk_name_variants(raw)]
+        if not _CJK_NAME_RE.match(raw) or len(raw) < 3:
+            return []   # a 2-char cue-found nickname (阿寶, 小恩) has no derivable variants
+        surname, given = cjk_split(raw)
+        out: list[tuple[re.Pattern, bool]] = []
+        if len(given) >= 2:
+            out.append((re.compile(re.escape(given)), False))
+        if given:
+            ah = "阿" + given[-1]
+            if ah not in kinship_zh_with_ah():
+                out.append((re.compile(re.escape(ah)), False))
+        return out
+    stripped = strip_title(raw)
+    parts = [p for p in _SPLIT_RE.split(stripped) if p]
+    stop = common_words()
+    out = []
+    if len(parts) >= 2:
+        out.append((re.compile(flexible_literal(stripped), re.IGNORECASE), False))
+        if raw != stripped:
+            out.append((re.compile(flexible_literal(raw), re.IGNORECASE), False))
+        for a, b in zip(parts, parts[1:]):
+            out.append((re.compile(flexible_literal(f"{a} {b}"), re.IGNORECASE), False))
+    elif raw != stripped:
+        out.append((re.compile(flexible_literal(raw), re.IGNORECASE), False))
+    for part in parts:
+        if len(part) < 3:
+            continue
+        if part.lower() not in stop:
+            out.append((re.compile(LB + re.escape(part) + RB, re.IGNORECASE), False))
+        else:
+            cap = part[0].upper() + part[1:].lower()
+            out.append((re.compile(LB + re.escape(cap) + RB), True))
+    return out
+
+
 # --- layer 1 matcher -------------------------------------------------------------------
 @dataclass(frozen=True)
 class _Form:
@@ -206,31 +258,15 @@ class KnownMatcher:
         raw = (name or "").strip()
         if not raw:
             return
+        for regex, conditional in _person_forms(raw, cjk_suffixes=True):
+            self.forms.append(_Form(regex, PERSON, canonical, conditional=conditional))
         if has_cjk(raw):
             for variant in cjk_name_variants(raw):
-                self.forms.append(_Form(re.compile(re.escape(variant)), PERSON, canonical))
                 self._part_index[variant] = canonical
             return
-        stripped = strip_title(raw)
-        parts = [p for p in _SPLIT_RE.split(stripped) if p]
-        stop = common_words()
-        if len(parts) >= 2:
-            self.forms.append(_Form(re.compile(flexible_literal(stripped), re.IGNORECASE), PERSON, canonical))
-            if raw != stripped:
-                self.forms.append(_Form(re.compile(flexible_literal(raw), re.IGNORECASE), PERSON, canonical))
-            for a, b in zip(parts, parts[1:]):
-                self.forms.append(_Form(re.compile(flexible_literal(f"{a} {b}"), re.IGNORECASE), PERSON, canonical))
-        elif raw != stripped:
-            self.forms.append(_Form(re.compile(flexible_literal(raw), re.IGNORECASE), PERSON, canonical))
-        for p in parts:
-            if len(p) < 3:
-                continue
-            self._part_index[p.lower()] = canonical
-            if p.lower() not in stop:
-                self.forms.append(_Form(re.compile(LB + re.escape(p) + RB, re.IGNORECASE), PERSON, canonical))
-            else:
-                cap = p[0].upper() + p[1:].lower()
-                self.forms.append(_Form(re.compile(LB + re.escape(cap) + RB), PERSON, canonical, conditional=True))
+        for part in (p for p in _SPLIT_RE.split(strip_title(raw)) if p):
+            if len(part) >= 3:
+                self._part_index[part.lower()] = canonical
 
     def spans(self, text: str, *, today: date | None = None) -> list[Span]:
         out: list[Span] = []
@@ -291,6 +327,14 @@ def cjk_split(name: str) -> tuple[str, str]:
     return name[0], name[1:]
 
 
+# 老X is a name only when X is a surname and the compound is not an everyday word.
+_OLD_STOP = frozenset({
+    "老師", "老友", "老闆", "老板", "老婆", "老公", "老人", "老爺", "老豆", "老媽", "老爸", "老細", "老年", "老化",
+    "老大", "老家", "老實", "老是",
+})
+_GE_ZE_STOP = frozenset({"小姐", "大姐", "老姐"})
+
+
 def cjk_name_variants(name: str) -> list[str]:
     """Full name plus the colloquial variants that map to the same token (A3)."""
     name = name.strip()
@@ -302,21 +346,34 @@ def cjk_name_variants(name: str) -> list[str]:
         out.append(given)
     for suf in _CJK_SUFFIX_VARIANTS:
         out.append(surname + suf)
+    old = "老" + surname
+    if old not in _OLD_STOP:
+        out.append(old)
     if given:
         ah = "阿" + given[-1]
         if ah not in kinship_zh_with_ah():
             out.append(ah)
-    return out
+        for suf in ("哥", "姐"):
+            form = given[-1] + suf
+            if form not in kinship_words() and form not in _GE_ZE_STOP:
+                out.append(form)
+    return list(dict.fromkeys(out))
 
 
 # --- layer 0: session-known originals ------------------------------------------------------
 class SessionMatcher:
     """Re-matches every original in the TokenMap (except AGE/DATE/DOB) and reuses
-    its token. Rebuilt only when the map's version changes."""
+    its token. Rebuilt only when the map's version changes.
+
+    A PERSON original also contributes its A2 parts / A3 given-name variants, so a third
+    party's name learned on turn 1 ("my daughter Mei Ling") is still recognised when only
+    part of it comes back on turn 5 ("Ling came again"). An AGE band the model echoed and
+    the re-identifier turned back into the bare number is re-matched too, otherwise "59"
+    would go out in clear on every following turn."""
 
     def __init__(self) -> None:
         self._version = -1
-        self._forms: list[tuple[re.Pattern, str]] = []
+        self._forms: list[tuple[re.Pattern, str, bool]] = []
 
     def _rebuild(self, token_map: TokenMap) -> None:
         self._forms = []
@@ -326,19 +383,30 @@ class SessionMatcher:
             if cls == PHONE:
                 digits = normalise_phone(original)
                 if len(digits) >= 7:
-                    self._forms.append((phone_regex(digits), token))
+                    self._forms.append((phone_regex(digits), token, False))
                 continue
             flags = 0 if has_cjk(original) else re.IGNORECASE
-            self._forms.append((re.compile(flexible_literal(original), flags), token))
+            self._forms.append((re.compile(flexible_literal(original), flags), token, False))
+            if cls == PERSON:
+                for regex, conditional in _person_forms(original, cjk_suffixes=False):
+                    self._forms.append((regex, token, conditional))
+        for token, cls, original in token_map.entries():
+            value = original.strip()
+            if cls == AGE and value.isdigit() and len(value) <= 3:
+                self._forms.append((re.compile(rf"(?<![\d]){re.escape(value)}(?![\d])"), token, False))
         self._version = token_map.version
 
     def spans(self, text: str, token_map: TokenMap) -> list[Span]:
         if token_map.version != self._version:
             self._rebuild(token_map)
         out: list[Span] = []
-        for regex, token in self._forms:
+        for regex, token, conditional in self._forms:
             cls = token_map.class_of(token)
             for m in regex.finditer(text):
+                if conditional and not _capitalised_part_ok(text, m.start(), m.end()):
+                    continue
+                if cls == AGE and clinical_guarded(text, m.start(), m.end()):
+                    continue   # "59 kg" / "pulse 59" is a reading, not the patient's age
                 out.append(Span(m.start(), m.end(), cls, PRIORITY_KNOWN, LAYER_SESSION, key=token_map.get(token), token=token))
         return out
 
@@ -387,13 +455,36 @@ _SURNAME_SHORT_STOP = frozenset({
 })
 
 
+# "my grandson little Timmy": a lowercase diminutive may sit between the cue and the name.
+_DIMINUTIVE = r"(?:(?i:little|baby|young)\s+)?"
+
+
 def _build_kinship_re() -> re.Pattern:
     latin, _ = split_scripts(kinship_words())
     k = _alt(latin)
     return re.compile(
         rf"{LB}(?:(?i:my|his|her|our|their|the)\s+)?(?i:{k})(?:\s*,\s*|\s+)(?:(?i:is|was)\s+)?(?i:called|named)?\s*,?\s*"
-        rf"({_NAME_EXCLUDE}{_NAME_WORD}(?:\s+{_NAME_EXCLUDE}{_NAME_WORD}){{0,2}}){RB}"
+        rf"{_DIMINUTIVE}({_NAME_EXCLUDE}{_NAME_WORD}(?:\s+{_NAME_EXCLUDE}{_NAME_WORD}){{0,2}}){RB}"
     )
+
+
+def _build_name_intro_re() -> re.Pattern:
+    """Name-introduction cues that are not kinship phrases: "<relative>'s name is X",
+    "Her name is X", "She's called X", "call me X", "I go by X", "my nickname is X".
+    Each branch captures the name only, so the resolver can map it to [PERSON_1] when it
+    is a variant of the patient's own name."""
+    latin, _ = split_scripts(kinship_words())
+    k = _alt(latin)
+    name = rf"({_NAME_EXCLUDE}{_NAME_WORD}(?:\s+{_NAME_EXCLUDE}{_NAME_WORD}){{0,2}}){RB}"
+    branches = (
+        rf"{LB}(?i:(?:(?:my|his|her|our|their|the)\s+)?(?:{k})'s|her|his|their|my)\s+(?i:name)"
+        rf"(?i:'s|\s+is|\s+was)\s+{_DIMINUTIVE}{name}",
+        rf"{LB}(?i:she|he|they)(?i:'s|\s+is|\s+was|\s+are|'re)\s+(?i:called|named)\s+{_DIMINUTIVE}{name}",
+        rf"{LB}(?i:(?:people|everyone|friends|they|you\s+can)\s+)?(?i:call)\s+(?i:me)\s+{_DIMINUTIVE}{name}",
+        rf"{LB}(?i:I)\s+(?i:go\s+by)\s+{_DIMINUTIVE}{name}",
+        rf"{LB}(?i:(?:my\s+)?nickname)(?i:'s|\s+is|\s+was)\s+{_DIMINUTIVE}{name}",
+    )
+    return re.compile("|".join(branches))
 
 
 # Ambiguous surnames are excluded from the cue-gated ZH kinship rule (高興, 容易,
@@ -452,11 +543,22 @@ def _build_kinship_zh_re() -> re.Pattern:
     # initials in Hong Kong (家俊, 家豪, 可欣); the two-character stoplist covers 家裡/可以.
     stop = re.escape("".join(sorted(ch for ch in ZH_STOP - _NAME_INITIALS if has_cjk(ch))))
     return re.compile(
-        rf"(?:{k})(?:叫|叫做|名叫|係|是)?\s*"
+        rf"(?:{k})(?:個名|嘅名|的名|名字|名)?(?:叫|叫做|名叫|係|是|就係|就是)?\s*"
         rf"((?:阿|小)[一-鿿](?![一-鿿])"
         rf"|(?:{compound}|[{surnames}])[一-鿿]{{1,2}}{_ZH_NAME_TAIL}"
         rf"|(?![{stop}])(?![一-鿿][得咗緊埋晒])[一-鿿]{{2}}{_ZH_NAME_TAIL}"   # 瞓得/食咗 are verb + particle
         rf"|{_NAME_WORD}(?:\s{_NAME_WORD})?)"
+    )
+
+
+def _build_kinship_zh_rev_re() -> re.Pattern:
+    """The reversed introduction "美玲係我個女": a sentence-initial given name, then 係我…<kinship>."""
+    _, cjk = split_scripts(kinship_words())
+    k = _alt(cjk)
+    stop = re.escape("".join(sorted(ch for ch in ZH_STOP - _NAME_INITIALS if has_cjk(ch))))
+    return re.compile(
+        # The name is lazy so "家俊就係我個仔" captures 家俊 and lets 就係 be the cue, not 家俊就 + 係.
+        rf"(?:^|[，。、！？,.!?\s])((?![{stop}])[一-鿿]{{2,3}}?)(?:係|是|就係|就是)我(?:個|嘅|的)?(?:{k})"
     )
 
 
@@ -481,7 +583,9 @@ class NameRules:
         self.title_zh_re = _build_title_zh_re()
         self.surname_short_re = _build_surname_short_re()
         self.kinship_re = _build_kinship_re()
+        self.name_intro_re = _build_name_intro_re()
         self.kinship_zh_re = _build_kinship_zh_re()
+        self.kinship_zh_rev_re = _build_kinship_zh_rev_re()
         self.occupation_en_re, self.occupation_zh_re = _build_occupation_re()
         self._ah_stop = kinship_zh_with_ah()
         latin_kin, _ = split_scripts(kinship_words())
@@ -507,6 +611,9 @@ class NameRules:
                 person(m.start(), m.end(), m.group(1))
         for m in self.kinship_re.finditer(text):
             person(m.start(1), m.end(1), m.group(1))
+        for m in self.name_intro_re.finditer(text):
+            g = next(i for i in range(1, m.re.groups + 1) if m.group(i))
+            person(m.start(g), m.end(g), m.group(g))
         for m in self.occupation_en_re.finditer(text):
             out.append(Span(m.start(1), m.end(1), OCCUPATION, PRIORITY_NAMES, LAYER_NAMES))
 
@@ -518,6 +625,11 @@ class NameRules:
                     continue
                 person(m.start(), m.end(), m.group(0))
             for m in self.kinship_zh_re.finditer(text):
+                surface = m.group(1)
+                if surface in self._ah_stop or surface in _ZH_GIVEN_STOP:
+                    continue
+                person(m.start(1), m.end(1), surface)
+            for m in self.kinship_zh_rev_re.finditer(text):
                 surface = m.group(1)
                 if surface in self._ah_stop or surface in _ZH_GIVEN_STOP:
                     continue

@@ -177,11 +177,11 @@ class TestUtilities:
         assert "timestamp" not in msg
 
     def test_generate_fallback_response(self):
-        resp = generate_fallback_response("Patient", "welcome")
+        resp = generate_fallback_response("welcome")
         assert "AI connection difficulty" in resp
 
     def test_generate_fallback_unknown_context(self):
-        resp = generate_fallback_response("Patient", "nonexistent")
+        resp = generate_fallback_response("nonexistent")
         assert "AI connection difficulty" in resp
 
     def test_validate_session_access_valid(self):
@@ -313,24 +313,35 @@ from tests.factories import make_doctor, make_user, patient_ref_for
 class TestRefusedFallback:
 
     def test_refused_in_english(self):
-        text = generate_fallback_response("Test Patient", "refused", "en")
+        text = generate_fallback_response("refused", "en")
         assert text == REFUSED_MESSAGES["en"]
-        assert "care team" in text and "Test Patient" not in text
+        assert "care team" in text
         assert "AI connection difficulty" not in text
+        # The scripted copy never speaks in Florence's first person while saying Florence is away.
+        assert "telling me" not in text and "your care team will read it" in text
 
     def test_refused_in_cantonese(self):
-        text = generate_fallback_response("Test Patient", "refused", "zh-HK")
+        text = generate_fallback_response("refused", "zh-HK")
         assert text == REFUSED_MESSAGES["zh-HK"]
         assert "醫療團隊" in text
+        # Nothing has been shared yet when this is the opener, and Florence is not the one asking.
+        assert "多謝你今日嘅分享" not in text and "你可以繼續講講" not in text
 
     def test_refused_default_is_bilingual(self):
-        text = generate_fallback_response("Test Patient", "refused")
+        text = generate_fallback_response("refused")
         assert REFUSED_MESSAGES["en"] in text and REFUSED_MESSAGES["zh-HK"] in text
-        assert generate_fallback_response("x", "refused", "fr") == text
+        assert generate_fallback_response("refused", "fr") == text
 
     def test_other_contexts_keep_the_connection_message(self):
         for context in ("welcome", "processing_error", "general_followup", "system_error", "anything"):
-            assert generate_fallback_response("x", context, "zh-HK") == CONNECTION_ERROR_MESSAGE
+            assert generate_fallback_response(context, "zh-HK") == CONNECTION_ERROR_MESSAGE
+
+    def test_scripted_replies_take_no_patient_name(self):
+        """The patient's real name is never passed into the scripted copy (it was an ignored arg)."""
+        import inspect
+
+        assert "patient_name" not in inspect.signature(generate_fallback_response).parameters
+        assert "patient_name" not in inspect.signature(handle_ai_response_error).parameters
 
 
 class TestErrorHandlingLogsTypeOnly:
@@ -400,13 +411,16 @@ class TestKnownIdentifiersFromUser:
     def test_dob_from_legacy_birthdate_field(self):
         known = build_known_identifiers(self._db(), make_user())  # birthdate "01/01/1990", no dob
         assert known.dob == date(1990, 1, 1)
-        assert "01/01" in known.extra and "1/1" in known.extra
+        # Slash forms are left to the generalisation layer (they resolve to [DOB], not [ID_n], and
+        # listing them here would redact "pain 7/10"); the year-less dotted and ZH forms stay.
+        assert "01/01" not in known.extra and "1/1" not in known.extra
+        assert "01.01" in known.extra and "1月1" in known.extra
 
     def test_dob_field_wins_and_iso_is_parsed(self):
         user = make_user({"dob": "1966-08-22"})
         known = build_known_identifiers(self._db(user), user)
         assert known.dob == date(1966, 8, 22)
-        assert dob_day_month_forms(known.dob) == ["08/22", "22/08", "8/22", "22/8", "22.08", "08.22"]
+        assert dob_day_month_forms(known.dob) == ["22.08", "08.22", "8月22", "八月二十二", "八月廿二"]
 
     def test_unparseable_dob_kept_verbatim_and_no_day_month_forms(self):
         user = make_user({"birthdate": "sometime in 1990"})

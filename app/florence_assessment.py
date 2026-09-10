@@ -8,20 +8,20 @@ stored `patient_id` field only - it is never written into a model-bound message.
 """
 
 import logging
-import os
 from typing import Any, Dict, List, Optional
 
 from .inference import InferenceRefused, InferenceRequest, get_gateway
 from .florence_utils import (
     SymptomAssessmentOutput,
     create_timestamp,
+    load_prompt_template,
     model_messages,
     should_flag_symptoms,
+    status_label,
+    task_metadata,
 )
 
 logger = logging.getLogger("ovis.florence")
-
-TREATMENT_STATUS_ZH = {"undergoing_treatment": "正在接受治療", "in_remission": "康復期"}
 
 ASSESSMENT_INSTRUCTIONS = (
     "You are a clinical documentation assistant for an oncology nursing service. "
@@ -32,33 +32,6 @@ ASSESSMENT_INSTRUCTIONS = (
     "dates and numbers as bracketed placeholders. Quote placeholders exactly as written (e.g. [PERSON_1]), "
     "never translate, reformat or drop the square brackets, and never guess who or where they refer to."
 )
-
-
-def load_prompt_template(filename: str, fallback: str) -> str:
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            text = f.read().strip()
-        return text or fallback
-    except OSError as e:
-        logger.warning("prompt file %s unavailable (%s); using fallback prompt", filename, type(e).__name__)
-        return fallback
-
-
-def status_label(treatment_status: str, language: str) -> str:
-    if language == "zh-HK":
-        return TREATMENT_STATUS_ZH.get(treatment_status, treatment_status)
-    return treatment_status
-
-
-def task_metadata(patient_ref: Optional[str], session_ref: Optional[str], task_source: str) -> Dict[str, Any]:
-    """Opaque refs only (patient_ref, session_ref, task_source) - the gateway logs every key."""
-    meta: Dict[str, Any] = {"task_source": task_source}
-    if patient_ref:
-        meta["patient_ref"] = patient_ref
-    if session_ref:
-        meta["session_ref"] = session_ref
-    return meta
 
 
 class FlorenceAssessment:
@@ -106,6 +79,10 @@ class FlorenceAssessment:
                 scrubbed=True,
                 known_identifiers=known_identifiers,
                 scrub_report=scrub_report,
+                # The appended turn is the static prompt template, not transcript: exempt it from the
+                # leak check so a session original that also occurs in the template (醫生, 翻譯) cannot
+                # refuse the whole assessment.
+                trusted_tail=1,
             ))
 
             assessment = result.parsed.model_dump()

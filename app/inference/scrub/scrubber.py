@@ -21,8 +21,8 @@ from .names import LAYER_NAMES, KnownIdentifiers, KnownMatcher, SessionMatcher, 
 from .ner import NERBackend, NullBackend, ner_spans
 from .patterns import pattern_spans
 from .tokens import (
-    LINKAGE_CLASSES, PERSON, SESSION_EXCLUDED, UNINDEXED, ScrubError, Span, TokenMap, flexible_literal, has_cjk,
-    normalise_phone, token_surface,
+    LEAK_EXCLUDED, LINKAGE_CLASSES, PERSON, UNINDEXED, ScrubError, Span, TokenMap,
+    flexible_literal, has_cjk, normalise_phone, token_surface,
 )
 
 logger = logging.getLogger("ovis.scrub")
@@ -88,14 +88,20 @@ def propagate_names(text: str, candidates: Iterable[Span]) -> list[Span]:
 
 
 def resolve_spans(spans: Iterable[Span]) -> list[Span]:
-    """Longest span wins; tie -> higher priority; then leftmost. No overlaps."""
+    """Longest span wins; tie -> higher priority; then leftmost. No overlaps.
+
+    Occupancy is tracked in a byte map rather than by scanning the accepted spans, so the
+    cost is linear in the text length instead of quadratic in the number of candidates
+    (an unbounded message used to block the event loop for seconds)."""
     ordered = sorted(spans, key=lambda s: (-s.length, -s.priority, s.start))
+    occupied = bytearray(max((s.end for s in ordered), default=0))
     chosen: list[Span] = []
     for s in ordered:
         if s.length <= 0:
             continue
-        if any(s.start < c.end and c.start < s.end for c in chosen):
+        if occupied.find(b"\x01", s.start, s.end) != -1:
             continue
+        occupied[s.start:s.end] = b"\x01" * (s.end - s.start)
         chosen.append(s)
     return sorted(chosen, key=lambda s: s.start)
 
@@ -142,7 +148,8 @@ class Scrubber:
         candidates += self._run("names", self._rules.spans, text, self._known)
         if not isinstance(self.ner, NullBackend):
             candidates += self._run("ner", ner_spans, text, self.ner, language)
-        candidates += self._run("generalise", generalise_spans, text, now=now, tz=self.tz, dob=self.known.dob)
+        candidates += self._run("generalise", generalise_spans, text, now=now, tz=self.tz, dob=self.known.dob,
+                                dob_md=_dob_md(self.known.dob, token_map))
         candidates += self._run("names", propagate_names, text, candidates)
 
         return self._run("resolve", self._apply, text, candidates, token_map, started)
@@ -157,7 +164,7 @@ class Scrubber:
             original = text[s.start:s.end]
             key = s.key or original
             if s.cls in UNINDEXED:
-                surface = token_map.token_for(s.cls, key, fixed=s.token)
+                surface = token_map.token_for(s.cls, key, fixed=s.token, dedup=s.dedup)
             elif s.token is not None:
                 surface = s.token
             else:
@@ -172,6 +179,22 @@ class Scrubber:
         report.linkage_score = len({s.cls for s in chosen} & LINKAGE_CLASSES)
         report.ms = _ms(started)
         return ScrubResult("".join(pieces), report, resolved)
+
+
+def _dob_md(dob, token_map: TokenMap) -> set[tuple[int, int]]:
+    """(month, day) pairs already established as the patient's birthday: the profile DOB plus the
+    one learned from a birth-cued date earlier in the session (stored as the [DOB] dedup key)."""
+    out: set[tuple[int, int]] = set()
+    if dob is not None:
+        out.add((dob.month, dob.day))
+    learned = token_map.dedup_for("[DOB]")
+    if learned:
+        try:
+            month, day = learned.split("-")
+            out.add((int(month), int(day)))
+        except ValueError:
+            pass
+    return out
 
 
 def _ms(started: float) -> float:
@@ -228,8 +251,8 @@ class ScrubContext:
         return out
 
     def leak_forms(self) -> list[str]:
-        """Known whole-string forms plus every session original (E4)."""
-        return self.known.leak_forms() + self.token_map.originals(exclude=SESSION_EXCLUDED)
+        """Known whole-string forms plus every session original (E4, exclude=LEAK_EXCLUDED)."""
+        return self.known.leak_forms() + self.token_map.originals(exclude=LEAK_EXCLUDED)
 
 
 # --- module-level conveniences --------------------------------------------------------------
@@ -272,7 +295,7 @@ def leak_check(messages: Iterable[dict], known: Iterable[str] | None, token_map:
     Never plain ``in``. The return value is for truthiness; never log it."""
     idents = [str(k) for k in (known or []) if k is not None]
     if token_map is not None:
-        idents += token_map.originals(exclude=SESSION_EXCLUDED)
+        idents += token_map.originals(exclude=LEAK_EXCLUDED)
     contents = _content_strings(messages)
     if not contents:
         return []

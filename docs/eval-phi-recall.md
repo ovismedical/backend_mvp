@@ -1,6 +1,6 @@
 # PHI recall eval — de-identification scrubber
 
-Generated 2026-09-09 23:38 UTC at commit `58136dba`. Corpus seed `20260909`, reference time `2026-09-09T10:00:00+08:00`. Produced by `tests/eval/phi_recall/run_phi_eval.py`; the deterministic run is asserted by `tests/eval/test_phi_recall.py` (direct >= 0.99, indirect >= 0.95, over-redaction <= 0.02, overall and per language). Corpus design, scoring rules, how to run the optional NER pass and how to read its table: `tests/eval/README.md`.
+Generated 2026-09-10 02:05 UTC. Corpus seed `20260909`, reference time `2026-09-09T10:00:00+08:00`. Produced by `tests/eval/phi_recall/run_phi_eval.py`; the deterministic run is asserted by `tests/eval/test_phi_recall.py` (direct >= 0.99, indirect >= 0.95, over-redaction <= 0.02, overall and per language). Corpus design, scoring rules, how to run the optional NER pass and how to read its table: `tests/eval/README.md`.
 
 ## Corpus
 
@@ -39,7 +39,7 @@ Scoring: a gold span counts as recalled when >= 80% of its characters are covere
 
 ## Backend: `none`
 
-Scrub time 0.34 s for 1844 turns.
+Scrub time 0.38 s for 1844 turns.
 
 ### Summary
 
@@ -55,7 +55,7 @@ Scrub time 0.34 s for 1844 turns.
 | past dates rendered as future | 0/48 | 0/21 | 0/27 |
 | DOB spans rendered as [DOB] | 31/31 | 14/14 | 17/17 |
 | facility spans touched by a PERSON token | 0 | 0 | 0 |
-| latency per turn p50 / p95 | 0.13 ms / 0.35 ms | 0.16 ms / 0.39 ms | 0.10 ms / 0.30 ms |
+| latency per turn p50 / p95 | 0.14 ms / 0.39 ms | 0.18 ms / 0.42 ms | 0.12 ms / 0.37 ms |
 
 ### Per-class — all
 
@@ -130,7 +130,7 @@ Distinct indirect classes (FACILITY, PLACE, ADDRESS, ORG, OCCUPATION, DATE, AGE)
 
 ## Backend: `presidio`
 
-Scrub time 5.17 s for 1844 turns.
+Scrub time 5.09 s for 1844 turns.
 
 ### Summary
 
@@ -146,7 +146,7 @@ Scrub time 5.17 s for 1844 turns.
 | past dates rendered as future | 0/47 | 0/21 | 0/26 |
 | DOB spans rendered as [DOB] | 30/31 | 14/14 | 16/17 |
 | facility spans touched by a PERSON token | 1 | 0 | 1 |
-| latency per turn p50 / p95 | 2.11 ms / 5.99 ms | 3.12 ms / 6.67 ms | 1.68 ms / 4.89 ms |
+| latency per turn p50 / p95 | 2.08 ms / 5.86 ms | 3.07 ms / 6.60 ms | 1.66 ms / 4.98 ms |
 
 ### Per-class — all
 

@@ -22,7 +22,6 @@ import json
 import logging
 import os
 import re
-import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
@@ -330,15 +329,6 @@ def _ms(x: float | None) -> str:
     return "n/a" if x is None else f"{x:.2f} ms"
 
 
-def _git_commit() -> str | None:
-    try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True,
-                             timeout=5, check=False)
-        return out.stdout.strip() or None
-    except Exception:  # git missing; the report simply omits the commit
-        return None
-
-
 def render_run(result: EvalResult, examples: int = 12) -> str:
     langs = ["all"] + sorted(result.by_language)
     cols = {"all": result.overall, **result.by_language}
@@ -441,10 +431,12 @@ def write_report(results: list[EvalResult], md_path: Path = DEFAULT_MD, json_pat
                  transcripts: list[Transcript] | None = None) -> None:
     stats = corpus_stats(transcripts if transcripts is not None else generate())
     generated_at = datetime.now(timezone.utc)
-    commit = _git_commit()
+    # No commit stamp: this runs before the report is committed, so it could only ever name the parent
+    # commit - a tree where these numbers are not reproducible. `git log docs/eval-phi-recall.json` is
+    # the honest provenance.
     md_path.parent.mkdir(parents=True, exist_ok=True)
-    md_path.write_text(render_report(results, stats, generated_at, commit), encoding="utf-8")
-    payload = {"generated_at": generated_at.isoformat(), "commit": commit, "seed": SEED, "overlap": OVERLAP,
+    md_path.write_text(render_report(results, stats, generated_at, None), encoding="utf-8")
+    payload = {"generated_at": generated_at.isoformat(), "seed": SEED, "overlap": OVERLAP,
                "corpus": stats, "runs": [r.to_dict() for r in results]}
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
 

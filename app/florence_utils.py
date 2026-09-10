@@ -5,7 +5,6 @@ Shared functionality for Florence conversation system using structured assessmen
 
 import logging
 import os
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Literal, Optional
 
@@ -13,7 +12,8 @@ from pydantic import BaseModel, Field
 
 from .inference.refs import patient_ref as _patient_ref
 from .inference.scrub import KnownIdentifiers, ScrubContext, ScrubError, TokenMap, ner_backend_from_env
-from .inference.scrub.tokens import ALL_CLASSES, LINKAGE_CLASSES
+from .inference.scrub.reidentify import TOKEN_RE
+from .inference.scrub.tokens import LINKAGE_CLASSES
 
 logger = logging.getLogger("ovis.florence")
 
@@ -121,17 +121,17 @@ CONNECTION_ERROR_MESSAGE = "AI connection difficulty. Please contact the develop
 REFUSED_MESSAGES = {
     "en": (
         "Thank you for checking in. Florence can't run the AI conversation right now, but everything you "
-        "share here is saved for your care team to read. Please carry on telling me how you've been feeling, "
-        "or come back later."
+        "share here is saved for your care team to read. Please carry on writing down how you've been "
+        "feeling — your care team will read it — or come back later."
     ),
     "zh-HK": (
-        "多謝你今日嘅分享。Florence 暫時未能進行 AI 對話，不過你喺呢度講嘅一切都會儲存俾你嘅醫療團隊查閱。"
-        "你可以繼續講講最近身體點樣，或者遲啲再返嚟。"
+        "多謝你今日嚟報到。Florence 暫時未能進行 AI 對話，不過你喺呢度講嘅一切都會儲存俾你嘅醫療團隊查閱。"
+        "你可以照樣寫低最近身體點樣，你嘅醫療團隊會睇到，或者遲啲再返嚟。"
     ),
 }
 
 
-def generate_fallback_response(patient_name: str, context: str = "general", language: Optional[str] = None) -> str:
+def generate_fallback_response(context: str = "general", language: Optional[str] = None) -> str:
     """Scripted replies when the model cannot answer.
 
     `context="refused"` is the friendly text for a policy refusal / scrubber failure, in the session
@@ -247,13 +247,13 @@ def format_conversation_history_for_ai(history: List[Dict], include_system_promp
     
     return ai_history
 
-def handle_ai_response_error(error: Exception, context: str = "general", patient_name: str = "there") -> Dict[str, Any]:
+def handle_ai_response_error(error: Exception, context: str = "general") -> Dict[str, Any]:
     """Standardized error handling for AI responses. Logs the exception type only - never its message."""
     logger.error("AI error in %s: %s", context, type(error).__name__)
 
     return {
         "error": type(error).__name__,
-        "response": generate_fallback_response(patient_name, "processing_error"),
+        "response": generate_fallback_response("processing_error"),
         "conversation_state": "starting",
 
         "progress": 0.0,
@@ -362,17 +362,43 @@ def lookup_doctor_identity(db, user: Dict) -> Dict[str, Any]:
     return doctor or {}
 
 
+_ZH_DIGIT_WORDS = ("零", "一", "二", "三", "四", "五", "六", "七", "八", "九")
+
+
+def zh_numerals(n: int) -> List[str]:
+    """Chinese numerals for 1-31: the plain 二十二 plus the colloquial 廿二 / 卅一."""
+    if n < 0 or n > 99:
+        return []
+    if n < 10:
+        return [_ZH_DIGIT_WORDS[n]]
+    tens, ones = divmod(n, 10)
+    tail = _ZH_DIGIT_WORDS[ones] if ones else ""
+    out = [("十" if tens == 1 else _ZH_DIGIT_WORDS[tens] + "十") + tail]
+    if tens == 2:
+        out.append("廿" + tail)
+    elif tens == 3:
+        out.append("卅" + tail)
+    return out
+
+
 def dob_day_month_forms(dob) -> List[str]:
-    """The DOB's day/month without the year ("01/01", "1/1", "01.01"): a defence-in-depth catch for
-    the numeric date forms the generalisation layer misses (e.g. a sentence-final "01/01/1990." -
-    app/inference/scrub/generalise.py SLASH_RE/DOT_RE refuse a trailing dot), so a partial DOB never
-    goes out in clear. Scrubbed as a whole token; the full date still wins when it is recognised."""
+    """The DOB's day and month in the year-less forms the generalisation layer cannot parse as a
+    date, so a partial DOB never goes out in clear:
+
+    - ``22.08`` / ``08.22`` — app/inference/scrub/generalise.py DOT_RE requires a 2- or 4-digit
+      year, so a bare day.month is not a date expression at all.
+    - ``8月22`` / ``八月廿二`` — ZH_DATE_NUM_RE and ZH_DATE_RE require a trailing 日 or 號.
+
+    Slash forms are deliberately omitted: SLASH_RE does parse a bare ``22/8``, which the
+    generaliser resolves to the single ``[DOB]`` token (A4), and listing them here would demote
+    that to ``[ID_n]`` and redact symptom scales such as ``pain 7/10`` (A6).
+    """
     if dob is None:
         return []
-    forms = [
-        dob.strftime("%m/%d"), dob.strftime("%d/%m"), f"{dob.month}/{dob.day}", f"{dob.day}/{dob.month}",
-        dob.strftime("%d.%m"), dob.strftime("%m.%d"),
-    ]
+    forms = [dob.strftime("%d.%m"), dob.strftime("%m.%d"), f"{dob.month}月{dob.day}"]
+    for month in zh_numerals(dob.month):
+        for day in zh_numerals(dob.day):
+            forms.append(f"{month}月{day}")
     return list(dict.fromkeys(forms))
 
 
@@ -416,9 +442,37 @@ def model_messages(history: Iterable[Dict]) -> List[Dict[str, str]]:
             if m.get("role") != "system"]
 
 
-_TOKEN_IN_TEXT_RE = re.compile(
-    r"[\[［【「〔]\s*(" + "|".join(ALL_CLASSES) + r")(?:[\s_\-]*\d+)?\s*(?:·[^\]］】」〕]*)?\s*[\]］】」〕]"
-)
+# ---------------------------------------------------------------------------
+# Prompt loading and gateway metadata, shared by the chat / assessment / triage call sites.
+# ---------------------------------------------------------------------------
+TREATMENT_STATUS_ZH = {"undergoing_treatment": "正在接受治療", "in_remission": "康復期"}
+
+
+def load_prompt_template(filename: str, fallback: str) -> str:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+        return text or fallback
+    except OSError as e:
+        logger.warning("prompt file %s unavailable (%s); using fallback prompt", filename, type(e).__name__)
+        return fallback
+
+
+def status_label(treatment_status: str, language: str) -> str:
+    if language == "zh-HK":
+        return TREATMENT_STATUS_ZH.get(treatment_status, treatment_status)
+    return treatment_status
+
+
+def task_metadata(patient_ref: Optional[str], session_ref: Optional[str], task_source: str = "florence") -> Dict[str, Any]:
+    """Opaque refs only (patient_ref, session_ref, task_source) - the gateway logs every key."""
+    meta: Dict[str, Any] = {"task_source": task_source}
+    if patient_ref:
+        meta["patient_ref"] = patient_ref
+    if session_ref:
+        meta["session_ref"] = session_ref
+    return meta
 
 
 def scrub_summary_from_messages(messages: Iterable[Dict], ner_backend: str = "none") -> Dict[str, Any]:
@@ -429,7 +483,7 @@ def scrub_summary_from_messages(messages: Iterable[Dict], ner_backend: str = "no
         content = m.get("content") if isinstance(m, dict) else m
         if not isinstance(content, str):
             continue
-        for match in _TOKEN_IN_TEXT_RE.finditer(content):
+        for match in TOKEN_RE.finditer(content):   # one token grammar, shared with the re-identifier
             cls = match.group(1).upper()
             counts[cls] = counts.get(cls, 0) + 1
     return {

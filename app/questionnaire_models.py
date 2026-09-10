@@ -1,8 +1,21 @@
 """Pydantic models for structured questionnaire storage (schema v2)."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
+
+# Free-text answers are synthesised into the triage transcript and run through the scrubber, so
+# they are bounded here: an unbounded body would otherwise burn CPU in the event loop.
+MAX_ANSWER_CHARS = 2000
+
+
+def cap_answer_text(answers: Dict[str, Any]) -> Dict[str, Any]:
+    """Reject any answer (or any string inside a list answer) longer than MAX_ANSWER_CHARS."""
+    for value in (answers or {}).values():
+        for item in (value if isinstance(value, list) else [value]):
+            if isinstance(item, str) and len(item) > MAX_ANSWER_CHARS:
+                raise ValueError(f"answer text must be at most {MAX_ANSWER_CHARS} characters")
+    return answers
 
 
 class SubmissionInput(BaseModel):
@@ -13,11 +26,15 @@ class SubmissionInput(BaseModel):
     completion_percentage: int = Field(ge=0, le=100)
     submission_mode: Optional[str] = None
 
+    _cap_answers = field_validator("answers")(cap_answer_text)
+
 
 class DraftInput(BaseModel):
     """Draft save payload — unchanged."""
     answers: Dict[str, Any]
     current_section: int = Field(ge=0)
+
+    _cap_answers = field_validator("answers")(cap_answer_text)
 
 
 class QuestionResponse(BaseModel):

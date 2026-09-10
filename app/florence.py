@@ -13,10 +13,10 @@ import logging
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .login import get_user, get_db
 from .inference import InferenceRefused, get_gateway
@@ -49,15 +49,22 @@ SESSIONS = "florence_sessions"
 PENDING_REVIEW_STATUS = "pending_clinician_review"
 
 
+# `language` is written into the audit trail and `treatment_status` is interpolated into the
+# prompt templates, so both are closed sets at the API boundary rather than free text.
 class StartSessionRequest(BaseModel):
-    language: str = "en"
-    input_mode: str = "keyboard"
-    treatment_status: str = "undergoing_treatment"
+    language: Literal["en", "zh-HK"] = "en"
+    input_mode: Literal["keyboard", "voice"] = "keyboard"
+    treatment_status: Literal["undergoing_treatment", "in_remission"] = "undergoing_treatment"
+
+
+# The scrubber is linear in the message length but unbounded input is still a way to burn
+# CPU in the event loop; a check-in turn is never this long.
+MAX_MESSAGE_CHARS = 4000
 
 
 class SendMessageRequest(BaseModel):
     session_id: str
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE_CHARS)
 
 
 class SessionResponse(BaseModel):
@@ -111,11 +118,6 @@ def active_session_count(db) -> int:
 # ---------------------------------------------------------------------------
 # De-identification helpers
 # ---------------------------------------------------------------------------
-def display_name_for(user: dict) -> str:
-    """What the patient sees as their own name: full_name, else username (OTP sign-ups have no full_name)."""
-    return (user.get("full_name") or "").strip() or user["username"]
-
-
 def refusal_reason_for(error: Exception) -> str:
     """Why a model call did not happen: the gate's decision reason, or `scrub_failed` for a scrubber error."""
     if isinstance(error, InferenceRefused):
@@ -189,7 +191,6 @@ async def analyse_transcript(
 async def start_florence_session(request: StartSessionRequest, user=Depends(get_user), db=Depends(get_db)):
     # millisecond timestamp + random suffix: two starts in the same second must not collide
     session_id = f"{user['username']}_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
-    display_name = display_name_for(user)
     pref, sref = patient_ref(user["username"]), session_ref(session_id)
     ai_available = get_gateway().available()
 
@@ -205,8 +206,13 @@ async def start_florence_session(request: StartSessionRequest, user=Depends(get_
                 language=request.language, patient_ref=pref, session_ref=sref, known_identifiers=ctx.leak_forms(),
                 scrub_report=scrub_summary_from_messages([{"role": "user", "content": OPENING_TURN}], ctx.ner.name),
             )
-            if "error" in florence_response:
-                ai_available = False  # no provider / provider error: today's fallback mode
+            if florence_response.get("unavailable"):
+                ai_available = False  # nothing configured: today's skipped/UNKNOWN fallback mode
+            elif "error" in florence_response:
+                # Transient provider error (timeout, 5xx): keep the session AI-enabled so the next
+                # turn and the finishing analysis retry instead of recording the chat as "skipped".
+                opening = generate_fallback_response("processing_error")
+                state = "starting"
             else:
                 opening = reidentify_reply(florence_response["response"], ctx, sref, florence_response.get("audit_id"))
                 state = florence_response.get("conversation_state", "starting")
@@ -215,13 +221,13 @@ async def start_florence_session(request: StartSessionRequest, user=Depends(get_
             # session remains "AI available" so finishing records pending_clinician_review, not skipped.
             refusal_reason = refusal_reason_for(e)
             logger.warning("florence session_ref=%s opening refused: %s reason=%s", sref, type(e).__name__, refusal_reason)
-            opening = generate_fallback_response(display_name, "refused", request.language)
+            opening = generate_fallback_response("refused", request.language)
             state = "starting"
         if ctx is not None:
             token_map_doc = ctx.token_map.to_dict()
     if not ai_available:
         logger.info("florence session_ref=%s starting in fallback mode (no provider)", sref)
-        opening = generate_fallback_response(display_name, "welcome")
+        opening = generate_fallback_response("welcome")
         state = "starting"
 
     session = {
@@ -261,7 +267,6 @@ async def send_message_to_florence_endpoint(request: SendMessageRequest, user=De
 
     history = list(session.get("conversation_history", []))
     history.append(create_conversation_message("user", request.message))
-    display_name = display_name_for(user)
     pref, sref = patient_ref(user["username"]), session_ref(request.session_id)
 
     state = session.get("florence_state", "assessing")
@@ -278,17 +283,17 @@ async def send_message_to_florence_endpoint(request: SendMessageRequest, user=De
                 scrub_report=scrub_summary_from_messages(outbound, ctx.ner.name),
             )
             if "error" in florence_response:
-                reply = generate_fallback_response(display_name, "processing_error")
+                reply = generate_fallback_response("processing_error")
             else:
                 reply = reidentify_reply(florence_response["response"], ctx, sref, florence_response.get("audit_id"))
                 state = florence_response.get("conversation_state", "assessing")
         except (InferenceRefused, ScrubError) as e:
             logger.warning("florence session_ref=%s turn refused: %s reason=%s", sref, type(e).__name__, refusal_reason_for(e))
-            reply = generate_fallback_response(display_name, "refused", language)
+            reply = generate_fallback_response("refused", language)
         if ctx is not None:
             token_map_doc = ctx.token_map.to_dict()
     else:
-        reply = generate_fallback_response(display_name, "general_followup")
+        reply = generate_fallback_response("general_followup")
 
     history.append(create_conversation_message("assistant", reply))
     _save_session(db, session, conversation_history=history, florence_state=state, token_map=token_map_doc)
@@ -341,6 +346,15 @@ async def _analyse_session(db, record_id, session: dict, user: dict) -> None:
             "flag_for_oncologist": completed["flag_for_oncologist"],
         }})
         logger.info("analysis complete for session_ref=%s alert=%s", sref, completed["alert_level"])
+    except asyncio.CancelledError:
+        # Shutdown or deploy cancelled us mid-call: never leave the record stuck at "generating",
+        # where it is invisible to the clinician and "still processing" to the patient.
+        logger.warning("analysis interrupted for session_ref=%s; saved for clinician review", sref)
+        try:
+            db.florence_assessments.update_one({"_id": record_id}, {"$set": pending_review_fields("interrupted")})
+        except Exception:  # noqa: BLE001 - we are being cancelled; nothing else can be done here
+            pass
+        raise
     except (InferenceRefused, ScrubError) as e:
         reason = refusal_reason_for(e)
         logger.warning("analysis refused for session_ref=%s: %s reason=%s; saved for clinician review", sref, type(e).__name__, reason)
@@ -447,7 +461,9 @@ async def get_session_result(session_id: str, user: Dict = Depends(get_user), db
 
 
 @florencerouter.get("/test")
-async def test_florence_endpoint(db=Depends(get_db)):
+async def test_florence_endpoint(user: Dict = Depends(get_user), db=Depends(get_db)):
+    """Operator smoke check. Authenticated: the body carries deployment/model names, per-provider
+    health and the compliance flags. The tokenless signal is GET /health -> florence_ai."""
     gateway = get_gateway()
     return {
         "status": "ok",
