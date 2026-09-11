@@ -73,7 +73,6 @@ class FlorenceAssessment:
                 + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else ""),
                 schema=SymptomAssessmentOutput,
                 language=session_language,
-                effort="low",
                 temperature=0.3,
                 metadata=task_metadata(patient_ref, session_ref, task_source),
                 scrubbed=True,

@@ -8,6 +8,8 @@ from typing import Protocol, TYPE_CHECKING
 
 from openai import AsyncOpenAI, BadRequestError
 
+from .tools import ToolCall
+
 if TYPE_CHECKING:
     from .gateway import InferenceRequest
 
@@ -52,6 +54,8 @@ class InferenceProvider(Protocol):
     model: str
 
     async def chat(self, request: "InferenceRequest", model: str | None = None) -> str: ...
+
+    async def chat_with_tools(self, request: "InferenceRequest", model: str | None = None): ...
 
     async def parse(self, request: "InferenceRequest", model: str | None = None): ...
 
@@ -105,6 +109,27 @@ class OpenAICompatibleProvider:
         if not text:
             raise RuntimeError(f"{self.name}: empty response")
         return text
+
+    async def chat_with_tools(self, request: "InferenceRequest", model: str | None = None):
+        """One turn that may call tools. Returns (text, tool_calls); either may be empty, and the
+        gateway decides what to do next. Tool results are fed back as `function_call_output` items
+        in `request.messages`, so nothing is carried between hops inside this method."""
+        model = model or self.model
+        kwargs: dict = {"instructions": request.instructions, "input": request.messages}
+        if request.tools:
+            kwargs["tools"] = request.tools.wire_format()
+            if request.tool_choice:
+                kwargs["tool_choice"] = request.tool_choice
+        response = await self._call(self.client.responses.create, request, model, **kwargs)
+        calls = tuple(
+            ToolCall(name=item.name, arguments=getattr(item, "arguments", "") or "{}", call_id=item.call_id)
+            for item in (getattr(response, "output", None) or [])
+            if getattr(item, "type", None) == "function_call"
+        )
+        text = (getattr(response, "output_text", "") or "").strip()
+        if not text and not calls:
+            raise RuntimeError(f"{self.name}: empty response")
+        return text, calls
 
     async def parse(self, request: "InferenceRequest", model: str | None = None):
         if request.schema is None:

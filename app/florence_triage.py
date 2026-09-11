@@ -81,7 +81,6 @@ class FlorenceTriage:
                 + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else ""),
                 schema=TriageAssessmentOutput,
                 language=session_language,
-                effort="high",
                 temperature=0.2,
                 metadata=task_metadata(patient_ref, session_ref, task_source),
                 scrubbed=True,

@@ -27,6 +27,7 @@ from .login import get_db, get_client, get_user  # noqa: E402
 from .inference import get_gateway  # noqa: E402
 from .inference.audit import MongoAuditSink, ensure_audit_indexes  # noqa: E402
 from .florence import ensure_session_index, wait_for_background  # noqa: E402
+from .florence_memory import ensure_memory_indexes  # noqa: E402
 from .florence_utils import pending_review_fields  # noqa: E402
 from .doctor import ensure_review_indexes  # noqa: E402
 
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
     try:
         db = get_db()
         ensure_session_index(db)
+        ensure_memory_indexes(db)
         ensure_review_indexes(db)
         ensure_audit_indexes(db)
         configure_gateway_audit(db)
@@ -122,9 +124,10 @@ from .triage_api import trierouter  # noqa: E402
 from .symptom_questionnaire import symptom_router  # noqa: E402
 from .admin import adminrouter  # noqa: E402
 from .achievements import achievementsrouter  # noqa: E402
+from .memories import memoriesrouter  # noqa: E402
 
 for router in (loginrouter, doctorrouter, questionsrouter, florencerouter, calendarrouter, otprouter,
-               analyticsrouter, trierouter, symptom_router, adminrouter, achievementsrouter):
+               analyticsrouter, trierouter, symptom_router, adminrouter, achievementsrouter, memoriesrouter):
     app.include_router(router)
 
 
@@ -169,6 +172,7 @@ async def configure_db(user=Depends(get_user), db=Depends(get_db)):
     db["auth_states"].create_index("expires_at", expireAfterSeconds=1)
     db["temp_users"].create_index("created_at", expireAfterSeconds=600)
     ensure_session_index(db)
+    ensure_memory_indexes(db)
     ensure_review_indexes(db)
     ensure_audit_indexes(db)
     return {"message": "Database indexes configured successfully"}

@@ -15,13 +15,13 @@ from .names import KnownIdentifiers, KnownMatcher, cjk_name_variants, parse_dob,
 from .ner import GlinerBackend, NERBackend, NERSpan, NullBackend, PresidioBackend, ner_backend_from_env  # noqa: F401
 from .reidentify import reidentify, reidentify_obj, reidentify_text  # noqa: F401
 from .scrubber import (  # noqa: F401
-    ResolvedSpan, ScrubContext, ScrubReport, ScrubResult, Scrubber, leak_check, scrub_messages, scrub_text,
+    ResolvedSpan, ScrubContext, ScrubReport, ScrubResult, Scrubber, leak_check, scrub_messages, scrub_text, tool_item_field,
 )
 from .tokens import ALL_CLASSES, CLASSES, ScrubError, Span, TokenMap  # noqa: F401
 
 __all__ = [
     "ALL_CLASSES", "CLASSES", "GlinerBackend", "KnownIdentifiers", "KnownMatcher", "NERBackend", "NERSpan",
     "NullBackend", "PresidioBackend", "ResolvedSpan", "ScrubContext", "ScrubError", "ScrubReport", "ScrubResult",
-    "Scrubber", "Span", "TokenMap", "cjk_name_variants", "leak_check", "ner_backend_from_env", "parse_dob",
+    "Scrubber", "Span", "TokenMap", "cjk_name_variants", "leak_check", "ner_backend_from_env", "parse_dob", "tool_item_field",
     "reidentify", "reidentify_obj", "reidentify_text", "scrub_messages", "scrub_text", "strip_title",
 ]

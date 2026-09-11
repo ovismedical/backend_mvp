@@ -14,6 +14,7 @@ RELATED_COLLECTIONS = [
     "user_achievements",
     "assessment_reviews",
     "florence_sessions",
+    "patient_memories",
 ]
 
 

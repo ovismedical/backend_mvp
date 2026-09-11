@@ -23,6 +23,8 @@ from .inference import InferenceRefused, get_gateway
 from .inference.refs import patient_ref, session_ref
 from .inference.scrub import ScrubContext, ScrubError, reidentify_obj, reidentify_text
 from .florence_ai import start_florence_conversation, send_message_to_florence
+from .florence_memory import extract_session_memories, memory_messages, memory_mode, recall_snapshot, seed_token_map
+from .florence_tools import CoverageState, build_registry
 from .florence_assessment import get_florence_structured_assessment
 from .florence_triage import get_florence_triage_assessment, get_alert_level_description
 from .florence_utils import (
@@ -142,6 +144,27 @@ def reidentify_reply(text: Optional[str], ctx: ScrubContext, sref: str, audit_id
     return out
 
 
+def model_history(history: list, tool_history: list | None) -> list:
+    """The model-bound sequence: role/content turns with each turn's tool items spliced back in.
+
+    Tool items are kept off `conversation_history` -- that list is rendered in the clinician view and
+    counted in analytics, and its consumers assume every entry has a role. They live in their own
+    session field and are put back in position here, so the model still sees what it recorded.
+    """
+    msgs = model_messages(history)
+    if not tool_history:
+        return msgs
+    by_position: dict[int, list] = {}
+    for entry in tool_history:
+        if isinstance(entry, dict) and entry.get("items"):
+            by_position.setdefault(int(entry.get("after", 0)), []).extend(entry["items"])
+    out: list = []
+    for position, message in enumerate(msgs, start=1):
+        out.append(message)
+        out.extend(by_position.get(position, []))
+    return out
+
+
 async def analyse_transcript(
     ctx: ScrubContext,
     history: list,
@@ -198,13 +221,24 @@ async def start_florence_session(request: StartSessionRequest, user=Depends(get_
     state = "starting"
     token_map_doc = None
     refusal_reason = None
+    memory_context: list = []
     if ai_available:
         ctx = None
         try:
             ctx = build_scrub_context(db, user)
+            now = datetime.now(timezone.utc)
+            if memory_mode() == "on":
+                # Seed before anything is scrubbed, so a person the notes name is tokenised (and
+                # leak-checked) in the notes and in everything the patient says this session.
+                memory_context = recall_snapshot(db, user["username"], now=now)
+                seed_token_map(ctx.token_map, memory_context)
+            preamble = ctx.scrub_messages(memory_messages(memory_context, now, request.language),
+                                          now=now, language=request.language)
             florence_response = await start_florence_conversation(
                 language=request.language, patient_ref=pref, session_ref=sref, known_identifiers=ctx.leak_forms(),
-                scrub_report=scrub_summary_from_messages([{"role": "user", "content": OPENING_TURN}], ctx.ner.name),
+                scrub_report=scrub_summary_from_messages(preamble + [{"role": "user", "content": OPENING_TURN}],
+                                                         ctx.ner.name),
+                preamble=preamble,
             )
             if florence_response.get("unavailable"):
                 ai_available = False  # nothing configured: today's skipped/UNKNOWN fallback mode
@@ -245,6 +279,7 @@ async def start_florence_session(request: StartSessionRequest, user=Depends(get_
         "ai_available": ai_available,
         "refusal_reason": refusal_reason,
         "token_map": token_map_doc,   # session-scoped re-identification map; never returned by any endpoint
+        "memory_context": memory_context,  # notes from earlier check-ins, for the model only; never returned
         "oncologist_notification_level": "none",
         "flag_for_oncologist": False,
         "expires_at": datetime.now(timezone.utc) + SESSION_TTL,
@@ -271,22 +306,38 @@ async def send_message_to_florence_endpoint(request: SendMessageRequest, user=De
 
     state = session.get("florence_state", "assessing")
     token_map_doc = session.get("token_map")
+    tool_history = list(session.get("tool_history") or [])
+    coverage = CoverageState.from_dict(session.get("symptom_state"))
     if session.get("ai_available"):
         ctx = None
         try:
             ctx = build_scrub_context(db, user, token_map_doc)
             now = datetime.now(timezone.utc)
-            outbound = ctx.scrub_messages(model_messages(history), now=now, language=language)
+            # Position for any tool items this turn produces: an index into the plain transcript,
+            # which is what model_history() splices against. Using the spliced length instead would
+            # drift once a second turn records something.
+            position = len(model_messages(history))
+            # Notes from earlier check-ins go first; `position` indexes the plain transcript, so tool
+            # items still splice back where they belong.
+            memory = memory_messages(session.get("memory_context") or [], now, language)
+            outbound = ctx.scrub_messages(memory + model_history(history, tool_history), now=now, language=language)
             florence_response = await send_message_to_florence(
                 outbound, language=language, patient_ref=pref, session_ref=sref,
                 known_identifiers=ctx.leak_forms(),
                 scrub_report=scrub_summary_from_messages(outbound, ctx.ner.name),
+                tools=build_registry(coverage),
+                scrub_tool_output=lambda text: ctx.scrub(text, now=now, language=language).text,
             )
             if "error" in florence_response:
                 reply = generate_fallback_response("processing_error")
             else:
                 reply = reidentify_reply(florence_response["response"], ctx, sref, florence_response.get("audit_id"))
                 state = florence_response.get("conversation_state", "assessing")
+                # The items are already de-identified (they were built from scrubbed input and
+                # scrubbed again on the way back), so they are stored as the model will replay them.
+                items = florence_response.get("tool_items") or []
+                if items:
+                    tool_history.append({"after": position, "items": items})
         except (InferenceRefused, ScrubError) as e:
             logger.warning("florence session_ref=%s turn refused: %s reason=%s", sref, type(e).__name__, refusal_reason_for(e))
             reply = generate_fallback_response("refused", language)
@@ -296,9 +347,11 @@ async def send_message_to_florence_endpoint(request: SendMessageRequest, user=De
         reply = generate_fallback_response("general_followup")
 
     history.append(create_conversation_message("assistant", reply))
-    _save_session(db, session, conversation_history=history, florence_state=state, token_map=token_map_doc)
+    _save_session(db, session, conversation_history=history, florence_state=state, token_map=token_map_doc,
+                  symptom_state=coverage.to_dict(), tool_history=tool_history)
 
-    return {"success": True, "message": "Message sent to Florence", "response": reply, "florence_state": state}
+    return {"success": True, "message": "Message sent to Florence", "response": reply, "florence_state": state,
+            "coverage": coverage.summary()}
 
 
 # Background analysis tasks (assessment + triage) keyed by session; awaited in tests via wait_for_background()
@@ -435,6 +488,10 @@ async def finish_florence_session(session_id: str, user: Dict = Depends(get_user
 
     if ai_available:
         track_background_task(asyncio.create_task(_analyse_session(db, inserted.inserted_id, session, user)))
+        if memory_mode() != "off":
+            # Its own task, not part of the analysis: a refused or failed extraction must never
+            # turn the clinical record into pending_clinician_review.
+            track_background_task(asyncio.create_task(extract_session_memories(db, session, user)))
 
     return {
         "message": get_localized_message("session_completed", language),

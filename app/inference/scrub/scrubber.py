@@ -201,6 +201,21 @@ def _ms(started: float) -> float:
     return (time.perf_counter() - started) * 1000.0
 
 
+# Responses API tool items are not {role, content} turns: a `function_call` carries its payload
+# under "arguments", a `function_call_output` under "output". They have to survive the replay --
+# the model needs its own call history to know what it already recorded -- and their payloads are
+# outbound content, so they get scrubbed like any other text.
+TOOL_ITEM_TEXT_FIELD = {"function_call": "arguments", "function_call_output": "output"}
+TOOL_PAYLOAD_KEYS = tuple(dict.fromkeys(TOOL_ITEM_TEXT_FIELD.values()))
+
+
+def tool_item_field(msg: Any) -> str | None:
+    """The payload key for a Responses API tool item, or None for an ordinary {role, content} turn."""
+    if not isinstance(msg, dict):
+        return None
+    return TOOL_ITEM_TEXT_FIELD.get(msg.get("type"))
+
+
 class ScrubContext:
     """Per-session state: the patient's identifiers, the TokenMap, the NER
     backend and a content cache. Reserves ``[PERSON_1]`` for the patient."""
@@ -222,10 +237,25 @@ class ScrubContext:
     def scrub(self, text: str, now=None, language: str | None = None) -> ScrubResult:
         return self.scrubber.scrub(text, self.token_map, now=now, language=language)
 
+    def _scrub_cached(self, text: str, today, now, language) -> str:
+        """Scrub one string, memoised on (content hash, token_map version, day). The store key
+        re-reads the version after scrubbing: a turn that taught the map a token caches under
+        the version that token belongs to."""
+        digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+        cached = self._cache.get((digest, self.token_map.version, today))
+        if cached is not None:
+            return cached
+        scrubbed = self.scrub(text, now=now, language=language).text
+        if len(self._cache) >= _CACHE_LIMIT:
+            self._cache.clear()
+        self._cache[(digest, self.token_map.version, today)] = scrubbed
+        return scrubbed
+
     def scrub_messages(self, messages: Iterable[dict], now=None, language: str | None = None) -> list[dict]:
-        """Scrub every turn (assistant turns too); keep only role + content.
-        Cached by (content hash, token_map.version[, day]); a token learned from
-        a later turn forces an earlier cached turn to be re-scrubbed."""
+        """Scrub every turn (assistant turns too), keeping role + content. Tool items keep all of
+        their keys and have their payload scrubbed in place, so the model's own call history
+        survives the replay. Cached by (content hash, token_map.version[, day]); a token learned
+        from a later turn forces an earlier cached turn to be re-scrubbed."""
         msgs = list(messages or [])
         today = _today(now, self.tz)
         out: list[dict] = []
@@ -233,19 +263,20 @@ class ScrubContext:
             start_version = self.token_map.version
             out = []
             for msg in msgs:
+                field = tool_item_field(msg)
+                if field is not None:
+                    item = dict(msg)
+                    payload = item.get(field)
+                    if not isinstance(payload, str):
+                        payload = "" if payload is None else str(payload)
+                    item[field] = self._scrub_cached(payload, today, now, language)
+                    out.append(item)
+                    continue
                 role = msg.get("role", "user") if isinstance(msg, dict) else "user"
                 content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
                 if not isinstance(content, str):
                     content = "" if content is None else str(content)
-                digest = hashlib.sha1(content.encode("utf-8")).hexdigest()
-                key = (digest, self.token_map.version, today)
-                scrubbed = self._cache.get(key)
-                if scrubbed is None:
-                    scrubbed = self.scrub(content, now=now, language=language).text
-                    if len(self._cache) >= _CACHE_LIMIT:
-                        self._cache.clear()
-                    self._cache[(digest, self.token_map.version, today)] = scrubbed
-                out.append({"role": role, "content": scrubbed})
+                out.append({"role": role, "content": self._scrub_cached(content, today, now, language)})
             if self.token_map.version == start_version:
                 break
         return out
@@ -274,6 +305,13 @@ _PHONE_LIKE_RE = re.compile(r"^[\s\d+()\-.]+$")
 def _content_strings(messages: Iterable[dict]) -> list[str]:
     out: list[str] = []
     for msg in messages or []:
+        if isinstance(msg, dict):
+            # Tool payloads carry text outbound without ever appearing under "content"; a leak
+            # check that cannot see them passes vacuously. Read them whenever they are present.
+            for key in TOOL_PAYLOAD_KEYS:
+                value = msg.get(key)
+                if isinstance(value, str):
+                    out.append(value)
         content = msg.get("content") if isinstance(msg, dict) else msg
         if isinstance(content, str):
             out.append(content)
@@ -317,5 +355,6 @@ def leak_check(messages: Iterable[dict], known: Iterable[str] | None, token_map:
 
 __all__ = [
     "ResolvedSpan", "ScrubContext", "ScrubReport", "ScrubResult", "Scrubber", "leak_check", "propagate_names", "resolve_spans",
+    "tool_item_field",
     "scrub_messages", "scrub_text",
 ]

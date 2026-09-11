@@ -6,7 +6,7 @@ Shared functionality for Florence conversation system using structured assessmen
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Literal, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional, get_args
 
 from pydantic import BaseModel, Field
 
@@ -68,6 +68,23 @@ class TriageAssessmentOutput(BaseModel):
     confidence_level: Literal["low", "medium", "high"]
     clinical_notes: Optional[str]
     treatment_status: Literal["undergoing_treatment", "in_remission"]
+
+
+MemoryCategory = Literal["pet", "food", "family", "hobby", "routine", "preference", "life_event", "other"]
+MEMORY_CATEGORIES = get_args(MemoryCategory)
+
+
+class MemoryOp(BaseModel):
+    op: Literal["add", "update", "forget"]
+    ref: Optional[str] = Field(description="For update or forget: the id of an existing note, e.g. m2. Null for add.")
+    text: Optional[str] = Field(description="For add or update: the note, one short timeless sentence. Null for forget.")
+    category: Optional[MemoryCategory] = Field(description="Null for forget")
+    durability: Optional[Literal["short", "long"]] = Field(
+        description="short = true only for a few days (a meal, this week's plans); long = lasting (a pet, family, a hobby). Null for forget.")
+
+
+class MemoryExtractionOutput(BaseModel):
+    ops: List[MemoryOp] = Field(description="Changes to the notes; an empty list when nothing new was shared")
 
 
 # Constants
@@ -311,8 +328,22 @@ def create_assessment_record(session_data: Dict, structured_assessment: Optional
         "florence_state": session_data.get("florence_state", "completed"),
         "ai_powered": session_data.get("ai_available", False),
         "oncologist_notification_level": oncologist_notification,
-        "flag_for_oncologist": flag_for_oncologist
+        "flag_for_oncologist": flag_for_oncologist,
+        # What Florence recorded during the conversation, and what she never got to. Shadow data
+        # for now: `structured_assessment` above is still produced by the after-the-fact extraction
+        # and is still what the clinician view reads. Keeping both is what lets them be compared.
+        "symptom_coverage": _coverage_block(session_data),
     }
+
+
+def _coverage_block(session_data: Dict) -> Optional[Dict[str, Any]]:
+    """Coverage summary plus the recorded ratings, or None for a session that ran without tools."""
+    state = session_data.get("symptom_state")
+    if not isinstance(state, dict) or not (state.get("records") or state.get("unassessable")):
+        return None
+    from .florence_tools import CoverageState  # local: florence_tools imports from this module's package
+    coverage = CoverageState.from_dict(state)
+    return {**coverage.summary(), "records": coverage.records, "unassessable_notes": coverage.unassessable}
 
 def create_session_response_data(session_data: Dict) -> Dict[str, Any]:
     """Create standardized session response data"""

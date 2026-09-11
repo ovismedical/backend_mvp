@@ -22,14 +22,48 @@ def _set_test_env(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key")
     monkeypatch.setenv("MONGODB_URI", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DB", "ovis-test")
-    # Routing policy: the compliance flag is on so openai-routed tasks run; refusal tests delenv it.
-    # Shell-level route/policy overrides must not leak into the suite.
+    # Routing policy: the shipped policy gates openai on `scrubbed` only, so the flag below does not
+    # decide anything today; it is set so a policy that *does* require it behaves predictably.
+    # Refusal tests use the `gated_policy_env` fixture instead. Shell-level overrides must not leak in.
     monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
     for var in ("INFERENCE_ROUTE_CHAT", "INFERENCE_ROUTE_ASSESSMENT", "INFERENCE_ROUTE_TRIAGE", "INFERENCE_POLICY_PATH"):
         monkeypatch.delenv(var, raising=False)
     # login.py reads SECRET_KEY at import time — patch the module-level variable
     import app.login as login_mod
     monkeypatch.setattr(login_mod, "SECRET_KEY", "test-secret-key-for-testing-only")
+
+
+
+# The shipped routing policy (app/inference/routing_policy.yaml) requires only `scrubbed`, so an
+# unset compliance flag no longer refuses anything. Tests that need a refusal install this policy,
+# which gates the openai provider on `dpa_ok`, and leave the flag unset.
+GATED_POLICY_YAML = """
+version: 1
+flags:
+  dpa_ok: {env: COMPLIANCE_DPA_OK, description: test gate}
+providers:
+  openai: {requires: [dpa_ok, scrubbed]}
+  local:  {requires: []}
+tools:
+  record_symptom:    {requires: [], discloses: none}
+  note_unassessable: {requires: [], discloses: none}
+tasks:
+  chat_turn:          {provider: openai, on_refuse: scripted_fallback}
+  symptom_assessment: {provider: openai, on_refuse: pending_clinician_review}
+  triage:             {provider: openai, on_refuse: pending_clinician_review}
+  pii_detect:         {provider: local,  on_refuse: skip}
+  memory_extraction:  {provider: openai, on_refuse: skip}
+"""
+
+
+@pytest.fixture
+def gated_policy_env(monkeypatch, tmp_path):
+    """Force every openai-routed task to refuse, by installing a flag-gated policy with the flag off."""
+    path = tmp_path / "gated-policy.yaml"
+    path.write_text(GATED_POLICY_YAML)
+    monkeypatch.setenv("INFERENCE_POLICY_PATH", str(path))
+    monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
+    return path
 
 
 # ---------------------------------------------------------------------------

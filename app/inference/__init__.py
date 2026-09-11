@@ -24,6 +24,7 @@ from .gateway import (  # noqa: F401
     reset_gateway,
 )
 from .router import Decision  # noqa: F401
+from .tools import ToolArgumentError, ToolCall, ToolRegistry, ToolSpec  # noqa: F401
 
 __all__ = [
     "Decision",
@@ -34,4 +35,8 @@ __all__ = [
     "ProviderUnavailable",
     "get_gateway",
     "reset_gateway",
+    "ToolArgumentError",
+    "ToolCall",
+    "ToolRegistry",
+    "ToolSpec",
 ]

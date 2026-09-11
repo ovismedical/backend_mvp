@@ -16,7 +16,7 @@ import logging
 import os
 import time
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +30,10 @@ DEFAULT_POLICY_PATH = Path(__file__).with_name("routing_policy.yaml")
 TRUTHY = frozenset({"1", "true", "yes"})
 SCRUBBED_REQUIREMENT = "scrubbed"
 ON_REFUSE_VALUES = frozenset({"scripted_fallback", "pending_clinician_review", "skip"})
+# What a tool puts into the model's context. "none" is a write: its arguments come from the
+# model and its result is authored here. "stored_phi" means the tool reads patient data out of
+# the database, which is the only case that needs the output scrubbed on the way back in.
+DISCLOSES_VALUES = frozenset({"none", "stored_phi"})
 
 # Every reason a Decision can carry. Call sites and tests key off these strings.
 REASON_OK = "ok"
@@ -39,9 +43,13 @@ REASON_PROVIDER_UNCONFIGURED = "provider_unconfigured"
 REASON_PROVIDER_UNHEALTHY = "provider_unhealthy"
 REASON_LEAK_CHECK_FAILED = "leak_check_failed"
 REASON_POLICY_MISSING_TASK = "policy_missing_task"
+REASON_POLICY_MISSING_TOOL = "policy_missing_tool"
+REASON_TOOL_NOT_REGISTERED = "tool_not_registered"
+REASON_TOOL_OUTPUT_UNSCRUBBED = "tool_output_unscrubbed"
 REASONS = (
     REASON_OK, REASON_DPA_NOT_CONFIRMED, REASON_NOT_SCRUBBED, REASON_PROVIDER_UNCONFIGURED,
     REASON_PROVIDER_UNHEALTHY, REASON_LEAK_CHECK_FAILED, REASON_POLICY_MISSING_TASK,
+    REASON_POLICY_MISSING_TOOL, REASON_TOOL_NOT_REGISTERED, REASON_TOOL_OUTPUT_UNSCRUBBED,
 )
 # A false flag maps to a refusal reason; unknown flags fall back to "<flag>_not_confirmed".
 FLAG_REASONS = {"dpa_ok": REASON_DPA_NOT_CONFIRMED}
@@ -62,6 +70,17 @@ class Flag:
 class ProviderPolicy:
     name: str
     requires: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ToolPolicy:
+    name: str
+    requires: tuple[str, ...] = ()
+    discloses: str = "none"
+
+    @property
+    def reads_stored_phi(self) -> bool:
+        return self.discloses == "stored_phi"
 
 
 @dataclass(frozen=True)
@@ -90,6 +109,7 @@ class Policy:
     flags: Mapping[str, Flag]
     providers: Mapping[str, ProviderPolicy]
     tasks: Mapping[str, TaskPolicy]
+    tools: Mapping[str, ToolPolicy] = field(default_factory=dict)
     source: str = "<dict>"
 
     # -- construction --------------------------------------------------------
@@ -145,7 +165,21 @@ class Policy:
                 raise PolicyError(f"{source}: tasks.{name}.on_refuse must be one of {sorted(ON_REFUSE_VALUES)}")
             tasks[str(name)] = TaskPolicy(name=str(name), provider=str(provider), on_refuse=str(on_refuse))
 
-        return cls(version=1, flags=flags, providers=providers, tasks=tasks, source=source)
+        tools: dict[str, ToolPolicy] = {}
+        for name, spec in _mapping(data.get("tools") or {}, f"{source}: tools").items():
+            spec = _mapping(spec or {}, f"{source}: tools.{name}")
+            requires = spec.get("requires") or []
+            if not isinstance(requires, list) or not all(isinstance(r, str) for r in requires):
+                raise PolicyError(f"{source}: tools.{name}.requires must be a list of names")
+            for requirement in requires:
+                if requirement != SCRUBBED_REQUIREMENT and requirement not in flags:
+                    raise PolicyError(f"{source}: tools.{name} requires undeclared flag {requirement!r}")
+            discloses = spec.get("discloses")
+            if discloses not in DISCLOSES_VALUES:
+                raise PolicyError(f"{source}: tools.{name}.discloses must be one of {sorted(DISCLOSES_VALUES)}")
+            tools[str(name)] = ToolPolicy(name=str(name), requires=tuple(requires), discloses=str(discloses))
+
+        return cls(version=1, flags=flags, providers=providers, tasks=tasks, tools=tools, source=source)
 
     # -- queries -------------------------------------------------------------
     def provider_for(self, task: str) -> str | None:
@@ -171,6 +205,7 @@ class Policy:
         return {
             "flags": self.flag_values(),
             "tasks": {name: {"provider": t.provider, "on_refuse": t.on_refuse} for name, t in self.tasks.items()},
+            "tools": {name: {"discloses": t.discloses} for name, t in self.tools.items()},
         }
 
 
@@ -258,6 +293,24 @@ class Router:
                 return Decision(allow=False, provider=wanted, reason=reason, on_refuse=on_refuse, task=task)
 
         return Decision(allow=True, provider=wanted, reason=REASON_OK, on_refuse=on_refuse, task=task)
+
+    def decide_tool(self, name: str, *, scrubbed: bool, task: str, provider: str | None,
+                    on_refuse: str | None) -> Decision:
+        """May this tool run? The policy's `tools` block is the allowlist: a tool it does not
+        declare is refused, so adding an executor is never enough to make a tool callable."""
+        spec = self.policy.tools.get(name)
+        if spec is None:
+            return Decision(allow=False, provider=provider, reason=REASON_POLICY_MISSING_TOOL,
+                            on_refuse=on_refuse, task=task)
+        for requirement in spec.requires:
+            if requirement == SCRUBBED_REQUIREMENT:
+                if not scrubbed:
+                    return Decision(allow=False, provider=provider, reason=REASON_NOT_SCRUBBED,
+                                    on_refuse=on_refuse, task=task)
+            elif not self.policy.flag_value(requirement):
+                reason = FLAG_REASONS.get(requirement, f"{requirement}_not_confirmed")
+                return Decision(allow=False, provider=provider, reason=reason, on_refuse=on_refuse, task=task)
+        return Decision(allow=True, provider=provider, reason=REASON_OK, on_refuse=on_refuse, task=task)
 
     def flag_value(self, name: str) -> bool:
         return self.policy.flag_value(name)

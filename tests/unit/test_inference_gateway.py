@@ -81,7 +81,8 @@ class TestRouting:
         gw = InferenceGateway({"openai": openai, "local": local})
         assert (await gw.complete(req("chat_turn"))).provider == "local"
         assert (await gw.complete(req("triage", schema=TriageAssessmentOutput))).provider == "openai"
-        assert gw.effective_routes() == {"chat_turn": "local", "symptom_assessment": "openai", "triage": "openai", "pii_detect": "local"}
+        assert gw.effective_routes() == {"chat_turn": "local", "symptom_assessment": "openai", "triage": "openai",
+                                         "pii_detect": "local", "memory_extraction": "openai"}
 
     async def test_constructor_routes_beat_env_routes(self, monkeypatch):
         openai, local = FakeProvider(name="openai"), FakeProvider(name="local")
@@ -250,6 +251,30 @@ class TestReasoningEffortNegotiation:
         assert provider.client.responses.create.await_args.kwargs["reasoning"] == {"effort": "none"}
 
 
+# The shipped policy gates the openai provider on `scrubbed` only (routing_policy.yaml keeps
+# `dpa_ok` declared but unrequired while we demo). Flag gating is still supported, so the tests
+# below that exercise it build their own gated policy instead of depending on the deployment.
+GATED_POLICY_YAML = """
+version: 1
+flags:
+  dpa_ok: {env: COMPLIANCE_DPA_OK, description: test gate}
+providers:
+  openai: {requires: [dpa_ok, scrubbed]}
+  local:  {requires: []}
+tasks:
+  chat_turn:          {provider: openai, on_refuse: scripted_fallback}
+  symptom_assessment: {provider: openai, on_refuse: pending_clinician_review}
+  triage:             {provider: openai, on_refuse: pending_clinician_review}
+  pii_detect:         {provider: local,  on_refuse: skip}
+"""
+
+
+def gated_router(tmp_path):
+    path = tmp_path / "gated.yaml"
+    path.write_text(GATED_POLICY_YAML)
+    return Router(Policy.load(path))
+
+
 class TestPolicyGate:
     """Every (scrubbed, dpa_ok, provider present, healthy) combination against the real YAML."""
 
@@ -257,14 +282,14 @@ class TestPolicyGate:
     @pytest.mark.parametrize("dpa_ok", [True, False])
     @pytest.mark.parametrize("present", [True, False])
     @pytest.mark.parametrize("healthy", [True, False])
-    async def test_openai_route_matrix(self, monkeypatch, scrubbed, dpa_ok, present, healthy):
+    async def test_openai_route_matrix(self, monkeypatch, tmp_path, scrubbed, dpa_ok, present, healthy):
         if dpa_ok:
             monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
         else:
             monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
         openai = FakeProvider(name="openai")
         providers = {"openai": openai} if present else {"local": FakeProvider(name="local")}
-        gw = InferenceGateway(providers, routes={"chat_turn": "openai"})
+        gw = InferenceGateway(providers, routes={"chat_turn": "openai"}, router=gated_router(tmp_path))
         if not healthy:
             for _ in range(3):
                 gw.health.record_failure("openai")
@@ -296,9 +321,9 @@ class TestPolicyGate:
         gw = InferenceGateway({"local": local}, routes={"chat_turn": "local"})
         assert (await gw.complete(req(scrubbed=False))).text == "local"
 
-    def test_on_refuse_mapping_follows_the_yaml(self, monkeypatch):
+    def test_on_refuse_mapping_follows_the_yaml(self, monkeypatch, tmp_path):
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
-        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, router=gated_router(tmp_path))
         expected = {"chat_turn": "scripted_fallback", "symptom_assessment": "pending_clinician_review",
                     "triage": "pending_clinician_review"}
         for task, on_refuse in expected.items():
@@ -307,16 +332,18 @@ class TestPolicyGate:
         pii = gw.decide("pii_detect", scrubbed=False)
         assert pii.reason == "provider_unconfigured" and pii.on_refuse == "skip"  # no local provider configured
 
-    def test_flag_is_read_at_decision_time(self, monkeypatch):
-        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+    def test_flag_is_read_at_decision_time(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, router=gated_router(tmp_path))
         assert gw.decide("chat_turn").allow is True
         monkeypatch.setenv("COMPLIANCE_DPA_OK", "no")
         assert gw.decide("chat_turn").reason == "dpa_not_confirmed"
         monkeypatch.setenv("COMPLIANCE_DPA_OK", "YES")
         assert gw.decide("chat_turn").allow is True
 
-    def test_policy_warnings_name_the_affected_provider(self, monkeypatch, caplog):
-        gw = InferenceGateway({"openai": FakeProvider(name="openai")})
+    def test_policy_warnings_name_the_affected_provider(self, monkeypatch, caplog, tmp_path):
+        monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, router=gated_router(tmp_path))
         assert gw.policy_warnings() == []
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
         with caplog.at_level(logging.WARNING, logger="ovis.inference"):
@@ -324,9 +351,10 @@ class TestPolicyGate:
         assert emitted == ["inference policy dpa_ok=false: openai-routed tasks will refuse"]
         assert "inference policy dpa_ok=false: openai-routed tasks will refuse" in caplog.text
 
-    def test_no_warning_when_nothing_routes_to_the_gated_provider(self, monkeypatch):
+    def test_no_warning_when_nothing_routes_to_the_gated_provider(self, monkeypatch, tmp_path):
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
-        gw = InferenceGateway({"local": FakeProvider(name="local")}, routes={t: "local" for t in TASKS})
+        gw = InferenceGateway({"local": FakeProvider(name="local")}, routes={t: "local" for t in TASKS},
+                              router=gated_router(tmp_path))
         assert gw.policy_warnings() == []
 
     def test_warning_when_a_route_names_an_unconfigured_provider(self, monkeypatch):
@@ -515,10 +543,13 @@ class TestAuditSink:
         dumped = repr(event)
         assert "HKID" not in dumped and "awful" not in dumped and "Grace" not in dumped
 
-    async def test_sink_receives_refuse_event(self, monkeypatch):
+    async def test_sink_receives_refuse_event(self, monkeypatch, tmp_path):
+        """A refusal is audited with its reason. Uses a flag-gated policy so the refusal is the
+        flag, not `not_scrubbed` — the shipped policy gates on scrubbing alone."""
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
         sink = RecordingSink()
-        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, audit_sink=sink)
+        gw = InferenceGateway({"openai": FakeProvider(name="openai")}, audit_sink=sink,
+                              router=gated_router(tmp_path))
         with pytest.raises(InferenceRefused):
             await gw.complete(req(metadata={"session_ref": "abc"}))
         assert len(sink.events) == 1

@@ -459,12 +459,11 @@ class TestAuditTrail:
 
 
 class TestRefusal:
-    """COMPLIANCE_DPA_OK unset: the policy refuses every openai call. Chat stays usable with a scripted
+    """A gated policy with its flag off refuses every openai call. Chat stays usable with a scripted
     reply, nothing is fabricated, and the finished check-in waits for a clinician."""
 
     @pytest.fixture
-    def refusing(self, monkeypatch):
-        monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
+    def refusing(self, monkeypatch, gated_policy_env):
         provider = FakeProvider(name="openai")
         reset_gateway(fake_gateway(openai=provider))
         yield provider
@@ -632,7 +631,8 @@ class TestLifespanWiring:
     """app.api's lifespan points the gateway's audit trail at Mongo, prepares the audit indexes and
     emits the rollout warning; /configure_db re-creates the audit indexes on demand."""
 
-    async def test_lifespan_wires_audit_sink_indexes_and_policy_warning(self, mock_db, monkeypatch, caplog):
+    async def test_lifespan_wires_audit_sink_indexes_and_policy_warning(self, mock_db, monkeypatch, caplog,
+                                                                        gated_policy_env):
         import app.api as api_module
 
         gateway = fake_gateway(openai=FakeProvider(name="openai"))

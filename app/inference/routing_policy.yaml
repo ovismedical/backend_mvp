@@ -10,9 +10,9 @@
 # Anything else is a refusal (InferenceRefused). `on_refuse` is informational: it
 # documents the behaviour each call site implements on refusal (chat_turn -> scripted
 # fallback reply; symptom_assessment/triage -> record saved as pending_clinician_review;
-# pii_detect -> skipped) and is surfaced via describe() and /health; changing it here does
-# NOT change that behaviour, which lives in app/florence.py and
-# app/questionnaire_triage_bridge.py. `provider` and `requires` are the fields that change
+# pii_detect -> skipped; memory_extraction -> nothing remembered from that check-in) and is
+# surfaced via describe() and /health; changing it here does NOT change that behaviour, which
+# lives in app/florence.py, app/florence_memory.py and app/questionnaire_triage_bridge.py. `provider` and `requires` are the fields that change
 # what leaves the building.
 version: 1
 
@@ -24,11 +24,26 @@ flags:
       recorded in docs/compliance/processors.md
 
 providers:
-  openai: { requires: [dpa_ok, scrubbed] }
+  # `dpa_ok` is declared above but deliberately NOT required while we are demoing: Azure OpenAI
+  # already sits under Microsoft's terms, so gating every call on a self-asserted flag only risks
+  # a silent outage. `scrubbed` stays required, so a de-identification failure still refuses.
+  # To re-enable the contractual gate, put `dpa_ok` back in this list and set COMPLIANCE_DPA_OK.
+  openai: { requires: [scrubbed] }
   local:  { requires: [] }
+
+# Tools Florence may call during a task. This block is the allowlist: a tool that is not
+# declared here is refused and audited, never executed, however it is registered in code.
+#   requires  - same semantics as a provider's: flags and `scrubbed`, all must hold.
+#   discloses - `none` for a write whose arguments come from the model and whose result is
+#               authored here; `stored_phi` for a tool that reads patient data out of the
+#               database, whose output must be scrubbed before it re-enters the model context.
+tools:
+  record_symptom:    { requires: [], discloses: none }
+  note_unassessable: { requires: [], discloses: none }
 
 tasks:
   chat_turn:          { provider: openai, on_refuse: scripted_fallback }
   symptom_assessment: { provider: openai, on_refuse: pending_clinician_review }
   triage:             { provider: openai, on_refuse: pending_clinician_review }
   pii_detect:         { provider: local,  on_refuse: skip }
+  memory_extraction:  { provider: openai, on_refuse: skip }

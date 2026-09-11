@@ -17,6 +17,28 @@ def write_policy(tmp_path, text, name="policy.yaml"):
     return path
 
 
+# The shipped policy deliberately does not gate the openai provider on a flag (see
+# routing_policy.yaml). Flag-gating is still a supported mechanism, so the tests that exercise it
+# build their own policy rather than depending on what the deployment happens to require today.
+GATED_POLICY = """
+version: 1
+flags:
+  dpa_ok: {env: COMPLIANCE_DPA_OK, description: test gate}
+providers:
+  openai: {requires: [dpa_ok, scrubbed]}
+  local:  {requires: []}
+tasks:
+  chat_turn: {provider: openai, on_refuse: scripted_fallback}
+  triage:    {provider: openai, on_refuse: pending_clinician_review}
+  pii_detect: {provider: local, on_refuse: skip}
+"""
+
+
+def gated_policy(tmp_path):
+    """A policy whose openai provider is gated on `dpa_ok`, for testing the flag mechanism."""
+    return Policy.load(write_policy(tmp_path, GATED_POLICY, name="gated.yaml"))
+
+
 class TestPolicyLoad:
 
     def test_default_path_is_the_yaml_next_to_the_module(self):
@@ -25,13 +47,15 @@ class TestPolicyLoad:
         assert policy.version == 1
         assert set(policy.flags) == {"dpa_ok"} and policy.flags["dpa_ok"].env == "COMPLIANCE_DPA_OK"
         assert "processors.md" in policy.flags["dpa_ok"].description
-        assert policy.providers["openai"].requires == ("dpa_ok", "scrubbed")
+        # The flag stays declared so it can be re-required, but the demo deployment does not gate on it.
+        assert policy.providers["openai"].requires == ("scrubbed",)
         assert policy.providers["local"].requires == ()
         assert {t: (p.provider, p.on_refuse) for t, p in policy.tasks.items()} == {
             "chat_turn": ("openai", "scripted_fallback"),
             "symptom_assessment": ("openai", "pending_clinician_review"),
             "triage": ("openai", "pending_clinician_review"),
             "pii_detect": ("local", "skip"),
+            "memory_extraction": ("openai", "skip"),
         }
 
     def test_custom_path_argument(self, tmp_path):
@@ -83,7 +107,8 @@ class TestPolicyLoad:
         }, source="inline")
         monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
         assert policy.describe() == {"flags": {"dpa_ok": True},
-                                     "tasks": {"chat_turn": {"provider": "openai", "on_refuse": "scripted_fallback"}}}
+                                     "tasks": {"chat_turn": {"provider": "openai", "on_refuse": "scripted_fallback"}},
+                                     "tools": {}}
         monkeypatch.delenv("COMPLIANCE_DPA_OK")
         assert policy.describe()["flags"] == {"dpa_ok": False}
 
@@ -104,9 +129,9 @@ class TestFlags:
         assert policy.flag_value("dpa_ok") is False and policy.flag_value("nonexistent") is False
         assert policy.flag_values() == {"dpa_ok": False}
 
-    def test_flags_are_resolved_at_decision_time_not_load_time(self, monkeypatch):
+    def test_flags_are_resolved_at_decision_time_not_load_time(self, monkeypatch, tmp_path):
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
-        router = Router(Policy.load())
+        router = Router(gated_policy(tmp_path))
         assert router.decide("chat_turn", scrubbed=True, providers=PROVIDERS).reason == "dpa_not_confirmed"
         monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
         assert router.decide("chat_turn", scrubbed=True, providers=PROVIDERS).allow is True
@@ -126,8 +151,10 @@ class TestDecide:
         decision = router.decide("triage", scrubbed=False, providers=PROVIDERS)
         assert (decision.allow, decision.reason, decision.on_refuse) == (False, "not_scrubbed", "pending_clinician_review")
 
-    def test_dpa_not_confirmed_is_checked_before_scrubbed(self, router, monkeypatch):
+    def test_dpa_not_confirmed_is_checked_before_scrubbed(self, monkeypatch, tmp_path):
+        """A flag requirement is reported before `scrubbed` when both fail (gated policy, not the shipped one)."""
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
+        router = Router(gated_policy(tmp_path))
         assert router.decide("triage", scrubbed=False, providers=PROVIDERS).reason == "dpa_not_confirmed"
 
     def test_local_provider_has_no_requirements(self, router, monkeypatch):
@@ -176,7 +203,7 @@ class TestDecide:
         assert refused.allow is False and refused.reason == "leak_check_failed"
         assert (refused.provider, refused.on_refuse, refused.task) == ("openai", "scripted_fallback", "chat_turn")
 
-    def test_every_reason_is_in_the_catalogue(self, router, monkeypatch):
+    def test_every_reason_is_in_the_catalogue(self, router, monkeypatch, tmp_path):
         seen = set()
         seen.add(router.decide("chat_turn", scrubbed=True, providers=PROVIDERS).reason)
         seen.add(router.decide("chat_turn", scrubbed=False, providers=PROVIDERS).reason)
@@ -187,8 +214,14 @@ class TestDecide:
             health.record_failure("openai")
         seen.add(router.decide("chat_turn", scrubbed=True, providers=PROVIDERS, health=health).reason)
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
-        seen.add(router.decide("chat_turn", scrubbed=True, providers=PROVIDERS).reason)
+        # The shipped policy gates on no flag, so the flag reason comes from a gated policy.
+        seen.add(Router(gated_policy(tmp_path)).decide("chat_turn", scrubbed=True, providers=PROVIDERS).reason)
         seen.add("leak_check_failed")
+        # Tool reasons come from decide_tool, which the task-level decide() never returns.
+        tool_kwargs = dict(scrubbed=True, task="chat_turn", provider="openai", on_refuse="scripted_fallback")
+        seen.add(router.decide_tool("never_declared", **tool_kwargs).reason)
+        seen.add("tool_not_registered")
+        seen.add("tool_output_unscrubbed")
         assert seen == set(REASONS)
         assert FLAG_REASONS == {"dpa_ok": "dpa_not_confirmed"}
 
@@ -205,8 +238,8 @@ class TestDecide:
 
 class TestWarnings:
 
-    def test_warns_only_for_routed_gated_providers(self, monkeypatch):
-        router = Router(Policy.load())
+    def test_warns_only_for_routed_gated_providers(self, monkeypatch, tmp_path):
+        router = Router(gated_policy(tmp_path))
         monkeypatch.setenv("COMPLIANCE_DPA_OK", "true")
         assert router.warnings({"chat_turn": "openai"}) == []
         monkeypatch.delenv("COMPLIANCE_DPA_OK")

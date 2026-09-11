@@ -36,6 +36,8 @@ class AuditEvent:
     patient_ref: str | None = None     # opaque HMAC, never a username
     session_ref: str | None = None     # opaque HMAC, never a session id
     task_source: str | None = None     # e.g. "florence" | "questionnaire"
+    tool: str | None = None            # declared tool name for a tool hop; never its arguments
+    hop: int | None = None             # tool-loop index; None for a single-shot call
     scrub: dict | None = None          # {counts, linkage_score, ner_backend} or None
     ts: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     kind: str = AUDIT_KIND

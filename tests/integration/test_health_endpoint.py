@@ -33,7 +33,7 @@ class TestHealthFlorenceState:
         body = (await client.get("/health")).json()
         assert body["florence_ai"] == "ready"
 
-    async def test_refusing_when_dpa_flag_is_off(self, client, mongo_ping, monkeypatch):
+    async def test_refusing_when_dpa_flag_is_off(self, client, mongo_ping, monkeypatch, gated_policy_env):
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
         reset_gateway(fake_gateway(openai=FakeProvider(name="openai"), policy=Policy.load()))
         body = (await client.get("/health")).json()
@@ -62,7 +62,7 @@ class TestHealthFlorenceState:
 class TestPolicyStartupWarning:
     """The lifespan calls gateway.log_policy_state(); the message must be exact so ops can alert on it."""
 
-    def test_warning_when_dpa_flag_is_false(self, monkeypatch, caplog):
+    def test_warning_when_dpa_flag_is_false(self, monkeypatch, caplog, gated_policy_env):
         monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
         gw = InferenceGateway({"openai": FakeProvider(name="openai")})
         with caplog.at_level(logging.WARNING, logger="ovis.inference"):

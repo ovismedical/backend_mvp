@@ -82,8 +82,8 @@ class TestQuestionnaireTriage:
             assert "Test Patient" in request.known_identifiers and "Mei Ling" in request.known_identifiers
             assert request.scrub_report["counts"]["PERSON"] >= 2
 
-    async def test_refusal_saves_the_questionnaire_for_clinician_review(self, client, patient_headers, seeded_db, provider, monkeypatch):
-        monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
+    async def test_refusal_saves_the_questionnaire_for_clinician_review(self, client, patient_headers, seeded_db, gated_policy_env, provider, monkeypatch):
+        monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)  # flag off; gated_policy_env supplies the gate
         body = await submit(client, patient_headers)
         qid = body["questionnaire_id"]
 
@@ -98,8 +98,8 @@ class TestQuestionnaireTriage:
         assert questionnaire["alert_level"] == "PENDING_REVIEW"
         assert provider.requests == []
 
-    async def test_pending_questionnaire_triage_is_visible_to_the_doctor(self, client, patient_headers, doctor_headers, provider, monkeypatch):
-        monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)
+    async def test_pending_questionnaire_triage_is_visible_to_the_doctor(self, client, patient_headers, doctor_headers, gated_policy_env, provider, monkeypatch):
+        monkeypatch.delenv("COMPLIANCE_DPA_OK", raising=False)  # flag off; gated_policy_env supplies the gate
         qid = (await submit(client, patient_headers))["questionnaire_id"]
         listing = (await client.get("/doctor/patient/testpatient/assessments", headers=doctor_headers)).json()
         [item] = [a for a in listing["assessments"] if a["session_id"] == f"questionnaire_{qid}"]

@@ -13,7 +13,7 @@ from tests.conftest import MockDatabase
 # The only keys an audit document may ever have. Adding one is a deliberate schema change.
 ALLOWED_KEYS = {
     "ts", "kind", "patient_ref", "session_ref", "task_source", "task", "provider", "model", "decision", "reason",
-    "scrub", "latency_ms", "outcome", "lang", "msgs",
+    "scrub", "latency_ms", "outcome", "lang", "msgs", "tool", "hop",
 }
 
 
@@ -32,9 +32,20 @@ class TestAuditEvent:
         assert doc["kind"] == "inference" and doc["task"] == "chat_turn" and doc["decision"] == "allow"
         assert doc["patient_ref"] == "a" * 16 and doc["session_ref"] == "b" * 12 and doc["scrub"] is None
 
+    def test_tool_hop_records_the_name_and_index_only(self):
+        doc = event(tool="record_symptom", hop=1).to_dict()
+        assert doc["tool"] == "record_symptom" and doc["hop"] == 1
+        assert set(doc) == ALLOWED_KEYS
+        assert "arguments" not in doc and "output" not in doc
+
+    def test_tool_fields_default_to_none_for_a_plain_call(self):
+        doc = event().to_dict()
+        assert doc["tool"] is None and doc["hop"] is None
+
     def test_has_no_field_that_could_hold_content(self):
         names = {f for f in AuditEvent.__dataclass_fields__}
-        for forbidden in ("messages", "content", "text", "instructions", "known_identifiers", "username", "name", "email"):
+        for forbidden in ("messages", "content", "text", "instructions", "known_identifiers", "username", "name",
+                          "email", "arguments", "output", "tool_arguments"):
             assert forbidden not in names
 
     def test_timestamp_is_utc_now_by_default(self):
