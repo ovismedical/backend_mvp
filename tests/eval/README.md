@@ -134,3 +134,31 @@ over-redaction trap; `{N:text}` is neutral (never counted). Literal template tex
 contain no identifiers — `test_persona_name_never_appears_outside_gold` and the
 stray-redaction count catch accidents. Changing templates changes the RNG sequence, so
 expect the numbers (not the bars) to move; regenerate the report afterwards.
+
+## The local-model scrubber pass (`SCRUB_NER_BACKEND=local`)
+
+`LocalModelBackend` (`app/inference/scrub/ner.py`) asks a model on our own network to name the
+identifiers it can see, and adds them to the deterministic layers. It only ever runs against the
+provider the routing policy assigns to `pii_detect`; if that provider is not the local one, it
+raises `ScrubError` rather than sending raw patient text to a vendor.
+
+**It is off by default, and the measurement is why.** Against the Chinese half of this corpus
+(MedGemma 4B via Ollama on Apple silicon, 2026-09-11):
+
+| | deterministic only | + local model |
+|---|---|---|
+| over-redaction | 0.0% | 3.4% |
+| latency per turn | under 1 ms | 0.8–5 s, with timeouts on long turns |
+| FACILITY recall | 13/13 | 13/13 |
+
+The deterministic layers already recalled every seeded identifier in the sample, so the model had
+no recall to add and instead removed clinical content that should have stayed. Worse, the backend
+fails closed by design: a timeout raises `ScrubError`, which refuses the chat turn. A pass that is
+slower, less precise and occasionally takes the conversation down is not worth enabling.
+
+This mirrors the Presidio result above. Both are recorded rather than deleted because "we tried the
+obvious thing and measured it" is the useful artefact; if the deterministic layers are ever shown
+to miss real-world Cantonese identifiers, the seam is here and the bar to beat is in this table.
+
+What the local model *is* good for on this hardware is answering the patient directly: routed as
+`chat_turn` it replies in about 0.6 s. See `app/inference/routing_policy.local.yaml`.

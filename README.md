@@ -98,14 +98,41 @@ See [.env.example](.env.example) for all required variables:
 - `MONGODB_DB` - Database name (default: `ovis-demo`)
 - `SECRET_KEY` - JWT signing key
 - `OPENAI_API_KEY` - OpenAI API key for Florence AI (`OPENAI_BASE_URL` points it at Azure OpenAI / Foundry)
-- `COMPLIANCE_DPA_OK` - `true` only once the Microsoft DPA covers the Azure subscription; while unset the routing policy refuses every `openai`-routed call (scripted chat fallback, assessments saved as `pending_clinician_review`, `/health` shows `florence_ai: refusing`)
+- `COMPLIANCE_DPA_OK` - declared in the routing policy but **not required** by the shipped one, so nothing needs to be set. Add `dpa_ok` to `providers.openai.requires` to turn the contractual gate back on; it then refuses every `openai`-routed call while unset (scripted chat fallback, assessments saved as `pending_clinician_review`, `/health` shows `florence_ai: refusing`)
 - `INFERENCE_POLICY_PATH` - optional alternative to `app/inference/routing_policy.yaml` (which task runs on which provider, and what each provider requires)
 - `INFERENCE_ROUTE_CHAT` / `INFERENCE_ROUTE_ASSESSMENT` / `INFERENCE_ROUTE_TRIAGE` - optional per-task provider override (`openai` or `local`); unset = the policy file's provider
 - `OPENAI_CHAT_MODEL` / `OPENAI_ASSESSMENT_MODEL` / `OPENAI_TRIAGE_MODEL` - optional per-task model (Azure: deployment names); unset = `OPENAI_MODEL`. This is how cost tiering is turned on: chat runs on every patient message at the cheapest reasoning effort, triage runs once per session at `high`, so pointing `OPENAI_CHAT_MODEL` at a smaller deployment splits them with no code change. `GET /health` reports the live picture under `cost` (`model_tiering: shared` while one deployment serves everything). Efforts and tool-hop caps live in `TASK_PROFILES` in `app/inference/gateway.py`.
-- `SCRUB_NER_BACKEND` - optional NER layer for the PHI scrubber: `none` (default), `presidio`, `gliner`; a configured but unavailable backend fails closed (chat refused, check-ins saved for clinician review)
+- `LOCAL_INFERENCE_URL` / `LOCAL_INFERENCE_MODEL` - an OpenAI-compatible server on your own network (Ollama, vLLM). With `INFERENCE_POLICY_PATH=app/inference/routing_policy.local.yaml` this gives the hybrid split: the patient's conversation is answered by the local model and never leaves the network, while assessment and triage reasoning go to Azure on a de-identified transcript. See [Hybrid routing](#hybrid-routing-self-hosted-chat-vendor-reasoning)
+- `SCRUB_NER_BACKEND` - optional NER layer for the PHI scrubber: `none` (default), `local`, `presidio`, `gliner`; a configured but unavailable backend fails closed (chat refused, check-ins saved for clinician review). `local` asks the model behind the policy's `pii_detect` route to name identifiers the deterministic layers missed; measured net-negative on the eval corpus, so it stays off (see [tests/eval/README.md](tests/eval/README.md))
 - `SECRET_KEY` also keys the opaque `patient_ref` / `session_ref` written to logs and `audit_events`; rotating it breaks the join between old audit rows and patients
 - `SENDGRID_API_KEY` - SendGrid for email
 - `CALENDAR_ENCRYPTION_KEY` - Calendar data encryption
+
+## Hybrid routing: self-hosted chat, vendor reasoning
+
+The router reads `app/inference/routing_policy.yaml` on every call and decides which provider serves
+which task. The shipped default sends everything to Azure OpenAI, because the hosted deployment has
+no GPU. `app/inference/routing_policy.local.yaml` is the alternative: private queries stay on a model
+you run, and only de-identified transcripts reach the vendor.
+
+```bash
+ollama pull medgemma && ollama serve
+# .env
+LOCAL_INFERENCE_URL=http://localhost:11434/v1
+LOCAL_INFERENCE_MODEL=medgemma:latest
+INFERENCE_POLICY_PATH=app/inference/routing_policy.local.yaml
+```
+
+| Task | Provider | Why |
+|---|---|---|
+| `chat_turn` | local | Raw patient conversation. Never leaves the network. ~0.6 s per turn on a 4B model. |
+| `pii_detect` | local | Must see unscrubbed text by definition. |
+| `symptom_assessment`, `triage` | Azure OpenAI | Highest-stakes reasoning, on a scrubbed transcript. |
+
+The split is enforced, not advisory: the vendor provider requires `scrubbed`, so a de-identification
+failure refuses instead of falling back, and a missing local server refuses the chat turn rather than
+quietly sending raw text to Azure. `tests/unit/test_routing_policy_local.py` fails if an edit ever
+routes a raw-text task off the network.
 
 ## API Endpoints
 

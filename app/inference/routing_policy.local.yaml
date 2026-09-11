@@ -1,0 +1,46 @@
+# Hybrid routing policy: private queries stay on a self-hosted model, reasoning goes to Azure.
+#
+# Select it with INFERENCE_POLICY_PATH=app/inference/routing_policy.local.yaml and point
+# LOCAL_INFERENCE_URL at an OpenAI-compatible server on your own network (Ollama, vLLM):
+#
+#   ollama pull medgemma && ollama serve
+#   LOCAL_INFERENCE_URL=http://localhost:11434/v1
+#   LOCAL_INFERENCE_MODEL=medgemma:latest
+#
+# What this buys: the patient's conversation — the turns that carry raw, unscrubbed intent — is
+# answered by a model inside your network, and only the de-identified transcript is sent to a
+# vendor for the assessment and triage reasoning. The default policy (routing_policy.yaml) sends
+# every task to Azure instead, because the hosted deployment has no GPU; this file is the
+# configuration to use when you are running the model yourself.
+#
+# Measured on this machine (MedGemma 4B via Ollama, Apple silicon, 2026-09-11):
+#   chat_turn on the local model      ~0.6 s per turn, comfortable for conversation
+#   pii_detect as a scrubber pass     ~0.8-5 s per turn, and it timed out on long turns
+# See docs/eval-phi-recall.md for why the scrubber's model pass stays off by default.
+version: 1
+
+flags:
+  dpa_ok:
+    env: COMPLIANCE_DPA_OK
+    description: >-
+      Microsoft DPA covers the Azure subscription and abuse-monitoring status is
+      recorded in docs/compliance/processors.md
+
+providers:
+  # Scrubbing is still required for the vendor route: de-identification is what makes the
+  # assessment and triage payloads safe to send, and a scrubber failure must still refuse.
+  openai: { requires: [scrubbed] }
+  local:  { requires: [] }
+
+tools:
+  record_symptom:    { requires: [], discloses: none }
+  note_unassessable: { requires: [], discloses: none }
+
+tasks:
+  # Private: raw patient conversation, answered inside our own network.
+  chat_turn:          { provider: local,  on_refuse: scripted_fallback }
+  pii_detect:         { provider: local,  on_refuse: skip }
+  # Reasoning: the highest-stakes judgements, on scrubbed transcripts only.
+  symptom_assessment: { provider: openai, on_refuse: pending_clinician_review }
+  triage:             { provider: openai, on_refuse: pending_clinician_review }
+  memory_extraction:  { provider: openai, on_refuse: skip }
