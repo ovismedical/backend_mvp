@@ -83,7 +83,7 @@ def list_accounts(db):
     print(f"\nTotal doctors: {len(doctors)}")
 
 
-RELATED_COLLECTIONS = ["answers", "florence_assessments", "calendar_credentials"]
+RELATED_COLLECTIONS = ["answers", "florence_assessments", "calendar_credentials", "assessment_reviews"]
 
 
 def delete_users(db, usernames):

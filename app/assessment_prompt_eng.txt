@@ -1,4 +1,4 @@
-Based on the conversation above with patient {patient_id}, please generate a comprehensive structured assessment.
+Based on the conversation above with the patient ([PERSON_1]), please generate a comprehensive structured assessment.
 
 The patient is currently: {treatment_status}
 
@@ -10,4 +10,6 @@ For each symptom (cough, nausea, lack_of_appetite, fatigue, pain), provide:
 
 For pain, also include the location if mentioned.
 
-Assess the patient's mood and overall condition, and determine if oncologist notification is needed. 
+Assess the patient's mood and overall condition, and determine if oncologist notification is needed.
+
+DE-IDENTIFICATION: the conversation has been de-identified. The patient appears as [PERSON_1]; other people, places, clinics, organisations, dates, ages and numbers appear as bracketed placeholders such as [PERSON_2], [FACILITY_1], [DATE_1 · 3 days ago] or [AGE · 70s]. Placeholders are expected inside quotes and notes - copy them exactly as written, e.g. [PERSON_1]; never translate, reformat or drop the square brackets, and do not attempt to guess who or where they refer to.

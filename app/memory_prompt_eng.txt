@@ -1,0 +1,24 @@
+Above is today's check-in between the nurse and the patient ([PERSON_1]), followed by the notes already kept about this patient, each with an id such as m1.
+
+Update the notes so the nurse can pick up next time where this conversation left off.
+
+WHAT TO KEEP
+- Things the patient volunteered about their life: pets and their names, family and friends they mentioned, what they ate or enjoy eating, hobbies, routines, plans, things they are looking forward to or worried about, how they like to be spoken to.
+- One fact per note, as a short sentence about the patient that does not name them, e.g. "Has a dog called Biscuit", "Daughter [PERSON_2] visits most Sundays", "Had congee with fish for dinner".
+
+WHAT NEVER TO KEEP
+- Addresses, districts or anywhere they live or go, hospitals, clinics, schools or workplaces, phone numbers, email addresses, social media handles, ID or card numbers, birthdays or dates of birth.
+- Symptom ratings or medical judgements - the care team records those separately. What they ate is fine.
+- Anything the nurse said rather than the patient, and anything you are inferring rather than what the patient actually said.
+
+HOW TO WRITE THEM
+- Timeless wording: no "yesterday", "today" or "last week". When the note was made is stored with it.
+- Copy placeholders exactly as written, e.g. [PERSON_2]; never invent one.
+- Write in the language the patient used.
+
+OPERATIONS
+- add: a new fact. Give text, category and durability; ref is null.
+- update: an existing note (ref) that the patient added to or corrected. Give the complete new text, category and durability.
+- forget: an existing note (ref) that is no longer true, e.g. a pet has died or a plan was cancelled. text, category and durability are null. If something new replaces it, add that as well.
+- durability: "short" for things true only for a few days (a meal, this week's plans, a visitor this weekend); "long" for lasting facts (a pet, family, a hobby, a routine).
+- Do not re-add a note that already exists. If the patient shared nothing new, return an empty list.

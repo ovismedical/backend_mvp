@@ -6,6 +6,7 @@ from .questionnaire_models import SubmissionInput, DraftInput
 from .questionnaire_enrichment import enrich_submission
 from .questionnaire_definitions import SECTIONS
 from .questionnaire_triage_bridge import generate_questionnaire_triage
+from .florence import track_background_task
 from fastapi import APIRouter, Depends, HTTPException, Header
 from typing import Optional
 from datetime import datetime, timezone
@@ -92,16 +93,18 @@ async def submit_symptom_questionnaire(
 
         result = questionnaires_collection.insert_one(enriched)
 
-        # Spawn background triage generation (fire-and-forget)
-        asyncio.create_task(
+        # Spawn background triage generation (fire-and-forget, tracked so tests/shutdown can await it).
+        # The raw inserted _id is passed through (ObjectId in production); the bridge uses this request's db.
+        track_background_task(asyncio.create_task(
             generate_questionnaire_triage(
                 enriched=enriched,
-                questionnaire_id=str(result.inserted_id),
+                questionnaire_id=result.inserted_id,
                 user=user,
-                language="en",
+                language=enriched.get("language") or "en",
                 treatment_status=user.get("treatment_status", "undergoing_treatment"),
+                db=db,
             )
-        )
+        ))
 
         streak, newly_unlocked = update_daily_streak(db, user["username"], x_timezone)
 

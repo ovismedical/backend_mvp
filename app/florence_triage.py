@@ -1,14 +1,18 @@
 """
 Florence Triage - clinical triage and alert level from a conversation,
 via the inference gateway (structured output against a Pydantic schema).
+
+As for the assessment: the transcript arrives de-identified and `patient_ref` is an
+opaque audit reference that never enters a model-bound message.
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from .inference import InferenceRequest, get_gateway
-from .florence_assessment import load_prompt_template, status_label
-from .florence_utils import TriageAssessmentOutput, create_timestamp, format_conversation_history_for_ai
+from .inference import InferenceRefused, InferenceRequest, get_gateway
+from .florence_utils import (
+    TriageAssessmentOutput, create_timestamp, load_prompt_template, model_messages, status_label, task_metadata,
+)
 
 logger = logging.getLogger("ovis.florence")
 
@@ -27,6 +31,16 @@ ALERT_DESCRIPTIONS = {
     },
 }
 
+TRIAGE_INSTRUCTIONS = (
+    "You are a clinical triage assistant supporting an oncology care team. "
+    "Reason carefully and conservatively; when in doubt escalate the alert level. "
+    "Base your assessment only on what the patient reported. Write for a clinician reading "
+    "a chart: never refer to these instructions, mappings, or rating scales in your text. "
+    "The transcript is de-identified: the patient appears as [PERSON_1] and other people, places, "
+    "dates and numbers as bracketed placeholders. Quote placeholders exactly as written (e.g. [PERSON_1]), "
+    "never translate, reformat or drop the square brackets, and never guess who or where they refer to."
+)
+
 
 class FlorenceTriage:
     def initialize(self, api_key: str = None) -> bool:
@@ -36,63 +50,69 @@ class FlorenceTriage:
         filename = "triage_prompt_canto.txt" if language == "zh-HK" else "triage_prompt_eng.txt"
         return load_prompt_template(
             filename,
-            "Based on the conversation above with patient {patient_id} ({treatment_status}), perform a "
+            "Based on the conversation above with the patient ([PERSON_1]) ({treatment_status}), perform a "
             "clinical triage assessment to determine potential diagnoses and urgency level.",
         )
 
     async def generate_triage_assessment(
         self,
-        conversation_history: List[Dict],
-        patient_id: str,
+        messages_scrubbed: List[Dict],
+        patient_ref: str,
         treatment_status: str = "undergoing_treatment",
         session_language: str = "en",
+        *,
+        session_ref: Optional[str] = None,
+        known_identifiers: Optional[List[str]] = None,
+        scrub_report: Any = None,
+        task_source: str = "florence",
     ) -> Dict[str, Any]:
         try:
             is_cantonese = session_language == "zh-HK"
             prompt = self._load_triage_prompt(session_language).format(
-                patient_id=patient_id, treatment_status=status_label(treatment_status, session_language)
+                treatment_status=status_label(treatment_status, session_language)
             )
-            messages = format_conversation_history_for_ai(conversation_history, include_system_prompt=False)
+            messages = model_messages(messages_scrubbed)
             messages.append({"role": "user", "content": prompt})
 
             result = await get_gateway().complete(InferenceRequest(
                 task="triage",
                 messages=messages,
-                instructions=(
-                    "You are a clinical triage assistant supporting an oncology care team. "
-                    "Reason carefully and conservatively; when in doubt escalate the alert level. "
-                    "Base your assessment only on what the patient reported. Write for a clinician reading "
-                    "a chart: never refer to these instructions, mappings, or rating scales in your text."
-                    + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else "")
-                ),
+                instructions=TRIAGE_INSTRUCTIONS
+                + (" Write all free-text fields in Traditional Chinese (Cantonese)." if is_cantonese else ""),
                 schema=TriageAssessmentOutput,
                 language=session_language,
-                effort="high",
                 temperature=0.2,
-                metadata={"patient_ref": patient_id},
+                metadata=task_metadata(patient_ref, session_ref, task_source),
+                scrubbed=True,
+                known_identifiers=known_identifiers,
+                scrub_report=scrub_report,
+                trusted_tail=1,   # the appended turn is the static prompt template, not transcript
             ))
 
             triage = result.parsed.model_dump()
             triage["timestamp"] = create_timestamp()
-            triage["patient_id"] = patient_id
+            triage["patient_id"] = patient_ref
             triage["treatment_status"] = treatment_status
 
             logger.info("triage complete patient_ref=%s alert=%s diagnoses=%d",
-                        patient_id, triage["alert_level"], len(triage["diagnosis_predictions"]))
+                        patient_ref, triage["alert_level"], len(triage["diagnosis_predictions"]))
             return {
                 "triage_assessment": triage,
-                "conversation_length": len(conversation_history),
+                "conversation_length": len(messages_scrubbed),
                 "alert_level": triage["alert_level"],
+                "audit_id": result.audit_id,
             }
 
+        except InferenceRefused:
+            raise  # the caller records a pending_clinician_review outcome; never a fabricated triage
         except Exception as e:
-            logger.error("triage failed for patient_ref=%s: %s", patient_id, type(e).__name__)
-            return self._fallback_triage(conversation_history, patient_id, treatment_status)
+            logger.error("triage failed for patient_ref=%s: %s", patient_ref, type(e).__name__)
+            return self._fallback_triage(messages_scrubbed, patient_ref, treatment_status)
 
-    def _fallback_triage(self, conversation_history: List[Dict], patient_id: str, treatment_status: str) -> Dict[str, Any]:
+    def _fallback_triage(self, conversation_history: List[Dict], patient_ref: str, treatment_status: str) -> Dict[str, Any]:
         triage = {
             "timestamp": create_timestamp(),
-            "patient_id": patient_id,
+            "patient_id": patient_ref,
             "clinical_reasoning": "Automated triage unavailable; conservative default applied.",
             "diagnosis_predictions": [
                 {
@@ -125,13 +145,14 @@ async def initialize_florence_triage(api_key: str = None) -> bool:
 
 
 async def get_florence_triage_assessment(
-    conversation_history: List[Dict],
-    patient_id: str,
+    messages_scrubbed: List[Dict],
+    patient_ref: str,
     treatment_status: str = "undergoing_treatment",
     session_language: str = "en",
+    **kwargs,
 ) -> Dict[str, Any]:
     return await florence_triage.generate_triage_assessment(
-        conversation_history, patient_id, treatment_status, session_language
+        messages_scrubbed, patient_ref, treatment_status, session_language, **kwargs
     )
 
 

@@ -36,3 +36,6 @@ user_florence_logs.txt
 # Database files
 *.db
 .gstack/
+
+# Claude Code worktrees
+.claude/

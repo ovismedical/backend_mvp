@@ -3,10 +3,19 @@ Florence AI Shared Utilities
 Shared functionality for Florence conversation system using structured assessment format
 """
 
-from typing import List, Dict, Optional, Any, Literal
-from datetime import datetime, timezone
-from pydantic import BaseModel, Field
+import logging
 import os
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List, Literal, Optional, get_args
+
+from pydantic import BaseModel, Field
+
+from .inference.refs import patient_ref as _patient_ref
+from .inference.scrub import KnownIdentifiers, ScrubContext, ScrubError, TokenMap, ner_backend_from_env
+from .inference.scrub.reidentify import TOKEN_RE
+from .inference.scrub.tokens import LINKAGE_CLASSES
+
+logger = logging.getLogger("ovis.florence")
 
 
 # ---------------------------------------------------------------------------
@@ -61,41 +70,52 @@ class TriageAssessmentOutput(BaseModel):
     treatment_status: Literal["undergoing_treatment", "in_remission"]
 
 
+MemoryCategory = Literal["pet", "food", "family", "hobby", "routine", "preference", "life_event", "other"]
+MEMORY_CATEGORIES = get_args(MemoryCategory)
+
+
+class MemoryOp(BaseModel):
+    op: Literal["add", "update", "forget"]
+    ref: Optional[str] = Field(description="For update or forget: the id of an existing note, e.g. m2. Null for add.")
+    text: Optional[str] = Field(description="For add or update: the note, one short timeless sentence. Null for forget.")
+    category: Optional[MemoryCategory] = Field(description="Null for forget")
+    durability: Optional[Literal["short", "long"]] = Field(
+        description="short = true only for a few days (a meal, this week's plans); long = lasting (a pet, family, a hobby). Null for forget.")
+
+
+class MemoryExtractionOutput(BaseModel):
+    ops: List[MemoryOp] = Field(description="Changes to the notes; an empty list when nothing new was shared")
+
+
 # Constants
 TARGET_SYMPTOMS = {"fatigue", "lack_of_appetite", "nausea", "cough", "pain"}
 PAIN_KEYWORDS = ["pain", "hurt", "ache", "sore", "discomfort"]
 
+FALLBACK_SYSTEM_PROMPT = (
+    "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling today. "
+    "The patient appears as [PERSON_1]; write placeholders exactly as given and never ask for real names, "
+    "addresses, ID numbers, phone numbers or exact dates."
+)
+
+
 def load_florence_system_prompt(language: str = "en") -> str:
-    """Load Florence system prompt from prompt file based on language"""
+    """Load the Florence system prompt for `language` from the prompt files next to this module."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    filename = "prompt_canto.txt" if language == "zh-HK" else "prompt_eng.txt"
+    prompt_file_path = os.path.join(current_dir, filename)
     try:
-        # Get the directory where this module is located
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Select prompt file based on language
-        if language == "zh-HK":
-            prompt_file_path = os.path.join(current_dir, "prompt_canto.txt")
-            print(f"🔤 Loading Cantonese prompt from {prompt_file_path}")
-        else:
-            prompt_file_path = os.path.join(current_dir, "prompt_eng.txt")
-            print(f"🔤 Loading English prompt from {prompt_file_path}")
-        
-        with open(prompt_file_path, 'r', encoding='utf-8') as file:
+        with open(prompt_file_path, "r", encoding="utf-8") as file:
             prompt = file.read().strip()
-            
         if not prompt:
             raise ValueError("Prompt file is empty")
-            
-        print(f"✅ Successfully loaded Florence system prompt from {prompt_file_path}")
+        logger.debug("loaded Florence system prompt %s", filename)
         return prompt
-        
     except FileNotFoundError:
-        print(f"❌ Prompt file not found at {prompt_file_path}")
-        # Fallback prompt
-        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling today."
+        logger.warning("Florence prompt file %s not found; using the built-in fallback prompt", filename)
+        return FALLBACK_SYSTEM_PROMPT
     except Exception as e:
-        print(f"❌ Error loading prompt file: {e}")
-        # Fallback prompt
-        return "You are Florence, a friendly AI nurse. Have a warm conversation to assess how the patient is feeling today."
+        logger.warning("Florence prompt file %s unusable (%s); using the built-in fallback prompt", filename, type(e).__name__)
+        return FALLBACK_SYSTEM_PROMPT
 
 def create_timestamp() -> str:
     """Create a standardized timestamp string"""
@@ -111,16 +131,35 @@ def create_conversation_message(role: str, content: str, include_timestamp: bool
         message["timestamp"] = create_timestamp()
     return message
 
-def generate_fallback_response(patient_name: str, context: str = "general") -> str:
-    """Generate fallback responses when AI is unavailable"""
-    error_message = "AI connection difficulty. Please contact the developers. 我們無法連接 AI。請聯繫開發人員。"
-    fallback_responses = {
-        "welcome": error_message,
-        "processing_error": error_message,
-        "general_followup": error_message,
-        "system_error": error_message
-    }
-    return fallback_responses.get(context, error_message)
+CONNECTION_ERROR_MESSAGE = "AI connection difficulty. Please contact the developers. 我們無法連接 AI。請聯繫開發人員。"
+
+# Shown when the routing policy refuses the model call (or the scrubber fails closed):
+# the chat stays open, nothing is lost, and the care team will read the transcript.
+REFUSED_MESSAGES = {
+    "en": (
+        "Thank you for checking in. Florence can't run the AI conversation right now, but everything you "
+        "share here is saved for your care team to read. Please carry on writing down how you've been "
+        "feeling — your care team will read it — or come back later."
+    ),
+    "zh-HK": (
+        "多謝你今日嚟報到。Florence 暫時未能進行 AI 對話，不過你喺呢度講嘅一切都會儲存俾你嘅醫療團隊查閱。"
+        "你可以照樣寫低最近身體點樣，你嘅醫療團隊會睇到，或者遲啲再返嚟。"
+    ),
+}
+
+
+def generate_fallback_response(context: str = "general", language: Optional[str] = None) -> str:
+    """Scripted replies when the model cannot answer.
+
+    `context="refused"` is the friendly text for a policy refusal / scrubber failure, in the session
+    language (`en`, `zh-HK`; anything else or None -> bilingual). Every other context is the
+    provider-connectivity message.
+    """
+    if context == "refused":
+        if language in REFUSED_MESSAGES:
+            return REFUSED_MESSAGES[language]
+        return f"{REFUSED_MESSAGES['en']}\n\n{REFUSED_MESSAGES['zh-HK']}"
+    return CONNECTION_ERROR_MESSAGE
 
 def get_localized_message(message_key: str, language: str = "en") -> str:
     """Get localized message based on language setting"""
@@ -225,13 +264,13 @@ def format_conversation_history_for_ai(history: List[Dict], include_system_promp
     
     return ai_history
 
-def handle_ai_response_error(error: Exception, context: str = "general", patient_name: str = "there") -> Dict[str, Any]:
-    """Standardized error handling for AI responses"""
-    print(f"❌ AI Error in {context}: {error}")
-    
+def handle_ai_response_error(error: Exception, context: str = "general") -> Dict[str, Any]:
+    """Standardized error handling for AI responses. Logs the exception type only - never its message."""
+    logger.error("AI error in %s: %s", context, type(error).__name__)
+
     return {
-        "error": str(error),
-        "response": generate_fallback_response(patient_name, "processing_error"),
+        "error": type(error).__name__,
+        "response": generate_fallback_response("processing_error"),
         "conversation_state": "starting",
 
         "progress": 0.0,
@@ -274,7 +313,9 @@ def create_assessment_record(session_data: Dict, structured_assessment: Optional
     return {
         "session_id": session_data["session_id"],
         "user_id": session_data["user_id"],
-        "user_info": session_data["user_info"],
+        # Opaque reference for audit joins; the display name is NOT copied onto the record any more
+        # (the doctor UI reads names from /doctor/patients/details).
+        "patient_ref": session_data.get("patient_ref") or _patient_ref(session_data["user_id"]),
         "language": session_data.get("language", "en"),
         "input_mode": session_data.get("input_mode", "keyboard"),
         "conversation_history": session_data["conversation_history"],
@@ -287,8 +328,22 @@ def create_assessment_record(session_data: Dict, structured_assessment: Optional
         "florence_state": session_data.get("florence_state", "completed"),
         "ai_powered": session_data.get("ai_available", False),
         "oncologist_notification_level": oncologist_notification,
-        "flag_for_oncologist": flag_for_oncologist
+        "flag_for_oncologist": flag_for_oncologist,
+        # What Florence recorded during the conversation, and what she never got to. Shadow data
+        # for now: `structured_assessment` above is still produced by the after-the-fact extraction
+        # and is still what the clinician view reads. Keeping both is what lets them be compared.
+        "symptom_coverage": _coverage_block(session_data),
     }
+
+
+def _coverage_block(session_data: Dict) -> Optional[Dict[str, Any]]:
+    """Coverage summary plus the recorded ratings, or None for a session that ran without tools."""
+    state = session_data.get("symptom_state")
+    if not isinstance(state, dict) or not (state.get("records") or state.get("unassessable")):
+        return None
+    from .florence_tools import CoverageState  # local: florence_tools imports from this module's package
+    coverage = CoverageState.from_dict(state)
+    return {**coverage.summary(), "records": coverage.records, "unassessable_notes": coverage.unassessable}
 
 def create_session_response_data(session_data: Dict) -> Dict[str, Any]:
     """Create standardized session response data"""
@@ -304,3 +359,180 @@ def create_session_response_data(session_data: Dict) -> Dict[str, Any]:
         "oncologist_notification_level": session_data.get("oncologist_notification_level", "none"),
         "flag_for_oncologist": session_data.get("flag_for_oncologist", False)
     } 
+
+# ---------------------------------------------------------------------------
+# De-identification helpers shared by the Florence chat and the questionnaire bridge.
+# The per-session ScrubContext is built from the patient's own record (plus their
+# doctor's name/hospital) and its TokenMap is persisted on the session document.
+# ---------------------------------------------------------------------------
+SCRUB_TZ = "Asia/Hong_Kong"
+OPENING_TURN = "Hello, I'm [PERSON_1]. I'm here for my health check-in."
+SCRUB_FAILED_REASON = "scrub_failed"
+
+_ner_cache: Dict[str, Any] = {}
+
+
+def _ner_backend():
+    """One NER backend per process and env value (a Presidio engine is expensive to build)."""
+    choice = (os.getenv("SCRUB_NER_BACKEND") or "none").strip().lower()
+    if choice not in _ner_cache:
+        _ner_cache[choice] = ner_backend_from_env()   # may raise ScrubError -> caller refuses
+    return _ner_cache[choice]
+
+
+def lookup_doctor_identity(db, user: Dict) -> Dict[str, Any]:
+    """The treating clinician's name and hospital (they appear in transcripts as 'Dr X' / 'at Y')."""
+    doctor_username = (user or {}).get("doctor")
+    if not doctor_username:
+        return {}
+    try:
+        doctor = db["doctors"].find_one({"username": doctor_username}, {"full_name": 1, "hospital": 1})
+    except Exception as e:  # noqa: BLE001 - a DB hiccup must not block the chat
+        logger.warning("doctor lookup failed for scrub context: %s", type(e).__name__)
+        return {}
+    return doctor or {}
+
+
+_ZH_DIGIT_WORDS = ("零", "一", "二", "三", "四", "五", "六", "七", "八", "九")
+
+
+def zh_numerals(n: int) -> List[str]:
+    """Chinese numerals for 1-31: the plain 二十二 plus the colloquial 廿二 / 卅一."""
+    if n < 0 or n > 99:
+        return []
+    if n < 10:
+        return [_ZH_DIGIT_WORDS[n]]
+    tens, ones = divmod(n, 10)
+    tail = _ZH_DIGIT_WORDS[ones] if ones else ""
+    out = [("十" if tens == 1 else _ZH_DIGIT_WORDS[tens] + "十") + tail]
+    if tens == 2:
+        out.append("廿" + tail)
+    elif tens == 3:
+        out.append("卅" + tail)
+    return out
+
+
+def dob_day_month_forms(dob) -> List[str]:
+    """The DOB's day and month in the year-less forms the generalisation layer cannot parse as a
+    date, so a partial DOB never goes out in clear:
+
+    - ``22.08`` / ``08.22`` — app/inference/scrub/generalise.py DOT_RE requires a 2- or 4-digit
+      year, so a bare day.month is not a date expression at all.
+    - ``8月22`` / ``八月廿二`` — ZH_DATE_NUM_RE and ZH_DATE_RE require a trailing 日 or 號.
+
+    Slash forms are deliberately omitted: SLASH_RE does parse a bare ``22/8``, which the
+    generaliser resolves to the single ``[DOB]`` token (A4), and listing them here would demote
+    that to ``[ID_n]`` and redact symptom scales such as ``pain 7/10`` (A6).
+    """
+    if dob is None:
+        return []
+    forms = [dob.strftime("%d.%m"), dob.strftime("%m.%d"), f"{dob.month}月{dob.day}"]
+    for month in zh_numerals(dob.month):
+        for day in zh_numerals(dob.day):
+            forms.append(f"{month}月{day}")
+    return list(dict.fromkeys(forms))
+
+
+def build_known_identifiers(db, user: Dict) -> KnownIdentifiers:
+    """Layer-1 identifiers for the scrubber: the patient's profile plus their doctor and hospital.
+    `dob` comes from `dob` or the legacy `birthdate` field (parsed by KnownIdentifiers)."""
+    doctor = lookup_doctor_identity(db, user)
+    known = KnownIdentifiers(
+        full_name=user.get("full_name"),
+        username=user["username"],
+        email=user.get("email"),
+        phone=user.get("phone"),
+        dob=user.get("dob") or user.get("birthdate"),
+        doctor_name=doctor.get("full_name"),
+        hospital=doctor.get("hospital"),
+    )
+    known.extra = list(known.extra) + dob_day_month_forms(known.dob)
+    return known
+
+
+def build_scrub_context(db, user: Dict, token_map_doc: Optional[Dict] = None) -> ScrubContext:
+    """A ScrubContext for this patient; `token_map_doc` is the session's persisted `token_map`
+    (None starts a fresh map). Raises ScrubError when the scrubber cannot be set up (fail closed):
+    the callers turn it into a refusal, never a 500, and the error carries no input text."""
+    try:
+        return ScrubContext(
+            known=build_known_identifiers(db, user),
+            token_map=TokenMap.from_dict(token_map_doc),
+            tz=SCRUB_TZ,
+            ner=_ner_backend(),
+        )
+    except ScrubError:
+        raise
+    except Exception as e:  # noqa: BLE001 - e.g. a malformed persisted token map
+        raise ScrubError("context", type(e).__name__) from None
+
+
+def model_messages(history: Iterable[Dict]) -> List[Dict[str, str]]:
+    """Conversation history as role/content pairs for the model: timestamps and system turns dropped."""
+    return [m for m in format_conversation_history_for_ai(list(history), include_system_prompt=False)
+            if m.get("role") != "system"]
+
+
+# ---------------------------------------------------------------------------
+# Prompt loading and gateway metadata, shared by the chat / assessment / triage call sites.
+# ---------------------------------------------------------------------------
+TREATMENT_STATUS_ZH = {"undergoing_treatment": "正在接受治療", "in_remission": "康復期"}
+
+
+def load_prompt_template(filename: str, fallback: str) -> str:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+        return text or fallback
+    except OSError as e:
+        logger.warning("prompt file %s unavailable (%s); using fallback prompt", filename, type(e).__name__)
+        return fallback
+
+
+def status_label(treatment_status: str, language: str) -> str:
+    if language == "zh-HK":
+        return TREATMENT_STATUS_ZH.get(treatment_status, treatment_status)
+    return treatment_status
+
+
+def task_metadata(patient_ref: Optional[str], session_ref: Optional[str], task_source: str = "florence") -> Dict[str, Any]:
+    """Opaque refs only (patient_ref, session_ref, task_source) - the gateway logs every key."""
+    meta: Dict[str, Any] = {"task_source": task_source}
+    if patient_ref:
+        meta["patient_ref"] = patient_ref
+    if session_ref:
+        meta["session_ref"] = session_ref
+    return meta
+
+
+def scrub_summary_from_messages(messages: Iterable[Dict], ner_backend: str = "none") -> Dict[str, Any]:
+    """Content-free summary of what is on the wire: placeholder counts per class and the
+    linkage score (distinct indirect-identifier classes present). Feeds the audit event."""
+    counts: Dict[str, int] = {}
+    for m in messages or []:
+        content = m.get("content") if isinstance(m, dict) else m
+        if not isinstance(content, str):
+            continue
+        for match in TOKEN_RE.finditer(content):   # one token grammar, shared with the re-identifier
+            cls = match.group(1).upper()
+            counts[cls] = counts.get(cls, 0) + 1
+    return {
+        "counts": counts,
+        "linkage_score": len(set(counts) & LINKAGE_CLASSES),
+        "ner_backend": ner_backend,
+    }
+
+
+def pending_review_fields(refusal_reason: str) -> Dict[str, Any]:
+    """Record fields for an assessment the policy refused: saved for a clinician, no AI output."""
+    return {
+        "structured_assessment": None,
+        "triage_assessment": None,
+        "alert_level": "PENDING_REVIEW",
+        "oncologist_notification_level": "none",
+        "flag_for_oncologist": False,
+        "triage_status": "pending_clinician_review",
+        "refusal_reason": refusal_reason,
+        "analysed_at": create_timestamp(),
+    }

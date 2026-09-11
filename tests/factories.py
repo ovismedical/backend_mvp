@@ -9,6 +9,13 @@ from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def patient_ref_for(username="testpatient"):
+    """The opaque patient_ref records carry (HMAC of the username under the test SECRET_KEY)."""
+    from app.inference.refs import patient_ref
+
+    return patient_ref(username)
+
+
 def make_user(overrides=None):
     """Create a test patient user dict (as stored in MongoDB 'users' collection)."""
     user = {
@@ -57,7 +64,7 @@ def make_florence_session(overrides=None):
     session = {
         "session_id": "testpatient_1710000000",
         "user_id": "testpatient",
-        "user_info": {"username": "testpatient", "full_name": "Test Patient"},
+        "patient_ref": patient_ref_for(),
         "language": "en",
         "input_mode": "keyboard",
         "treatment_status": "undergoing_treatment",
@@ -114,7 +121,7 @@ def make_assessment_record(overrides=None):
     record = {
         "session_id": "testpatient_1710000000",
         "user_id": "testpatient",
-        "user_info": {"username": "testpatient", "full_name": "Test Patient"},
+        "patient_ref": patient_ref_for(),
         "language": "en",
         "input_mode": "keyboard",
         "conversation_history": [
@@ -223,3 +230,37 @@ def make_questionnaire_answers(overrides=None):
     if overrides:
         answers.update(overrides)
     return answers
+
+
+def make_pending_assessment_record(overrides=None):
+    """A florence_assessments document whose AI assessment was refused and awaits a clinician (Decision 3)."""
+    record = make_assessment_record({
+        "session_id": "testpatient_1710009999",
+        "structured_assessment": None,
+        "triage_assessment": None,
+        "alert_level": "PENDING_REVIEW",
+        "triage_status": "pending_clinician_review",
+        "refusal_reason": "dpa_not_confirmed",
+        "oncologist_notification_level": "none",
+        "flag_for_oncologist": False,
+    })
+    if overrides:
+        record.update(overrides)
+    return record
+
+
+def make_review(overrides=None):
+    """An assessment_reviews document: one clinician's verdict on one Florence assessment."""
+    review = {
+        "session_id": "testpatient_1710000000",
+        "user_id": "testpatient",
+        "doctor": "testdoctor",
+        "agrees": True,
+        "alert_level_override": None,
+        "note": None,
+        "florence_alert_level": "GREEN",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if overrides:
+        review.update(overrides)
+    return review

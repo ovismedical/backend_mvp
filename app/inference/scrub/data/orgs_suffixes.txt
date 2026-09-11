@@ -1,0 +1,63 @@
+# Organisation suffixes (employers, schools, insurers, churches, companies).
+# A Capitalised phrase ending in one of the Latin suffixes, or a CJK phrase
+# ending in one of the CJK suffixes, is an ORG. One entry per line.
+
+# --- Latin ---
+School
+Primary School
+Secondary School
+College
+University
+Academy
+Institute
+Bank
+Limited
+Ltd
+Ltd.
+Company
+Co.
+Corporation
+Corp
+Corp.
+Group
+Holdings
+Insurance
+Church
+Kindergarten
+Foundation
+Association
+Society
+Trading
+Logistics
+Securities
+Properties
+Engineering
+Consultants
+Enterprises
+Industries
+
+# --- CJK ---
+學校
+中學
+小學
+大學
+書院
+學院
+幼稚園
+銀行
+公司
+有限公司
+集團
+保險
+教會
+堂會
+基金會
+協會
+學會
+商會
+工會
+證券
+物業
+工程
+貿易
+物流

@@ -3,24 +3,29 @@ Bridge between symptom questionnaire submissions and AI triage generation.
 Converts enriched questionnaire data into pseudo-conversation format,
 then feeds it to the existing Florence triage/assessment pipeline.
 Runs as a fire-and-forget background task after questionnaire submission.
+
+The synthesised conversation goes through a fresh ScrubContext (the patient's own
+identifiers plus their doctor's) before it reaches the gateway; model output is
+re-identified before it is stored. A policy refusal or scrubber failure saves the
+questionnaire for clinician review instead of fabricating a triage.
 """
 
 import asyncio
-import os
-from datetime import datetime, timezone
+import logging
 from typing import Any, Dict, List
 
 from .login import get_db
-from .inference import get_gateway
-from .florence_assessment import (
-    initialize_florence_assessment,
-    get_florence_structured_assessment,
-)
-from .florence_triage import (
-    initialize_florence_triage,
-    get_florence_triage_assessment,
-)
-from .florence_utils import create_assessment_record, create_timestamp
+from .inference import InferenceRefused, get_gateway
+from .inference.refs import patient_ref, session_ref
+from .inference.scrub import ScrubError
+from .florence import analyse_transcript, refusal_reason_for
+from .florence_utils import build_scrub_context, create_assessment_record, create_timestamp, pending_review_fields
+
+logger = logging.getLogger("ovis.questionnaire")
+
+TASK_SOURCE = "questionnaire"
+QUESTIONNAIRES = "symptom_questionnaires"
+ASSESSMENTS = "florence_assessments"
 
 
 def enriched_to_conversation_history(enriched: dict) -> List[Dict[str, str]]:
@@ -93,21 +98,50 @@ def enriched_to_conversation_history(enriched: dict) -> List[Dict[str, str]]:
     return messages
 
 
+def _set_questionnaire_status(db, questionnaire_id: Any, fields: Dict[str, Any]) -> None:
+    """Best-effort status update on the questionnaire document (raw `_id`: ObjectId in prod, int in tests)."""
+    try:
+        db[QUESTIONNAIRES].update_one({"_id": questionnaire_id}, {"$set": fields})
+    except Exception as e:  # noqa: BLE001 - a status update must not mask the outcome
+        logger.warning("questionnaire status update failed: %s", type(e).__name__)
+
+
+def _save_pending(db, session_data: Dict[str, Any], questionnaire_id: Any, qid: str, reason: str) -> None:
+    """Record a questionnaire whose triage did not happen as awaiting clinician review."""
+    try:
+        pending = create_assessment_record(session_data, None, None)
+        pending.update(pending_review_fields(reason))
+        pending["assessment_type"] = "questionnaire_triage"
+        pending["source_questionnaire_id"] = qid
+        db[ASSESSMENTS].insert_one(pending)
+    except Exception as e:  # noqa: BLE001 - never mask the outcome that got us here
+        logger.error("could not save pending questionnaire triage: %s", type(e).__name__)
+    _set_questionnaire_status(db, questionnaire_id, {
+        "triage_status": "pending_clinician_review", "alert_level": "PENDING_REVIEW",
+    })
+
+
 async def generate_questionnaire_triage(
     enriched: dict,
-    questionnaire_id: str,
+    questionnaire_id: Any,
     user: dict,
     language: str = "en",
     treatment_status: str = "undergoing_treatment",
+    *,
+    db=None,
 ) -> None:
     """Generate AI triage from a questionnaire submission (background task).
 
-    This is designed to be called via ``asyncio.create_task()`` so it runs
-    in the background without blocking the questionnaire submit response.
-    Failures are logged but never propagated — the questionnaire submission
-    is always considered successful regardless of triage outcome.
+    Designed to be called via ``asyncio.create_task()`` so it runs in the background
+    without blocking the questionnaire submit response. Failures are logged but never
+    propagated - the questionnaire submission is always considered successful
+    regardless of triage outcome. ``questionnaire_id`` is the raw inserted ``_id``;
+    ``db`` defaults to the application database (tests pass their own).
     """
-    db = get_db()
+    db = db if db is not None else get_db()
+    qid = str(questionnaire_id)
+    synthetic_session_id = f"questionnaire_{qid}"
+    pref, sref = patient_ref(user["username"]), session_ref(synthetic_session_id)
 
     try:
         # Build pseudo-conversation from enriched data
@@ -115,58 +149,26 @@ async def generate_questionnaire_triage(
 
         # Skip if too few messages (no answered sections)
         if len(conversation_history) < 3:
-            print(f"⏭️ Skipping triage for questionnaire {questionnaire_id}: too few responses")
-            db["symptom_questionnaires"].update_one(
-                {"_id": __import__("bson").ObjectId(questionnaire_id)},
-                {"$set": {"triage_status": "skipped"}},
-            )
+            logger.info("questionnaire triage skipped session_ref=%s: too few responses", sref)
+            _set_questionnaire_status(db, questionnaire_id, {"triage_status": "skipped"})
             return
 
         # Dedup: check if triage already exists for this questionnaire
-        existing = db["florence_assessments"].find_one(
-            {"session_id": f"questionnaire_{questionnaire_id}"}
-        )
+        existing = db[ASSESSMENTS].find_one({"session_id": synthetic_session_id})
         if existing:
-            print(f"⏭️ Triage already exists for questionnaire {questionnaire_id}")
+            logger.info("questionnaire triage already exists session_ref=%s", sref)
             return
 
         if not get_gateway().available():
-            print(f"⏭️ Skipping triage for questionnaire {questionnaire_id}: no inference provider configured")
-            db["symptom_questionnaires"].update_one(
-                {"_id": __import__("bson").ObjectId(questionnaire_id)},
-                {"$set": {"triage_status": "skipped"}},
-            )
+            logger.info("questionnaire triage skipped session_ref=%s: no inference provider configured", sref)
+            _set_questionnaire_status(db, questionnaire_id, {"triage_status": "skipped"})
             return
 
-        # Run triage + structured assessment in parallel
-        print(f"🚀 Generating triage for questionnaire {questionnaire_id}...")
-        assessment_result, triage_result = await asyncio.gather(
-            get_florence_structured_assessment(
-                conversation_history,
-                user["username"],
-                treatment_status,
-                language,
-            ),
-            get_florence_triage_assessment(
-                conversation_history,
-                user["username"],
-                treatment_status,
-                language,
-            ),
-        )
-
-        structured_assessment = (
-            assessment_result.get("structured_assessment") if assessment_result else None
-        )
-        triage_assessment = (
-            triage_result.get("triage_assessment") if triage_result else None
-        )
-
-        # Build session_data compatible with create_assessment_record
+        # Build session_data compatible with create_assessment_record (no display name on the record)
         session_data = {
-            "session_id": f"questionnaire_{questionnaire_id}",
+            "session_id": synthetic_session_id,
             "user_id": user["username"],
-            "user_info": {"username": user["username"], "full_name": user.get("full_name")},
+            "patient_ref": pref,
             "language": language,
             "input_mode": "questionnaire",
             "conversation_history": conversation_history,
@@ -175,32 +177,43 @@ async def generate_questionnaire_triage(
             "ai_available": True,
         }
 
-        assessment_record = create_assessment_record(
-            session_data, structured_assessment, triage_assessment
-        )
+        logger.info("generating questionnaire triage session_ref=%s", sref)
+        try:
+            ctx = build_scrub_context(db, user)
+            structured_assessment, triage_assessment = await analyse_transcript(
+                ctx, conversation_history, pref=pref, sref=sref, language=language,
+                treatment_status=treatment_status, task_source=TASK_SOURCE,
+            )
+        except asyncio.CancelledError:
+            # Shutdown or deploy cancelled us mid-call: save the questionnaire for the clinician
+            # rather than leaving it with no triage at all.
+            logger.warning("questionnaire triage interrupted session_ref=%s; saved for clinician review", sref)
+            _save_pending(db, session_data, questionnaire_id, qid, "interrupted")
+            raise
+        except (InferenceRefused, ScrubError) as e:
+            reason = refusal_reason_for(e)
+            logger.warning("questionnaire triage refused session_ref=%s: %s reason=%s; saved for clinician review",
+                           sref, type(e).__name__, reason)
+            _save_pending(db, session_data, questionnaire_id, qid, reason)
+            return
+
+        assessment_record = create_assessment_record(session_data, structured_assessment, triage_assessment)
 
         # Override assessment_type and add source reference
         assessment_record["assessment_type"] = "questionnaire_triage"
-        assessment_record["source_questionnaire_id"] = questionnaire_id
+        assessment_record["source_questionnaire_id"] = qid
+        assessment_record["triage_status"] = "completed"
+        assessment_record["analysed_at"] = create_timestamp()
 
         # Store in florence_assessments
-        db["florence_assessments"].insert_one(assessment_record)
+        db[ASSESSMENTS].insert_one(assessment_record)
 
         alert_level = assessment_record.get("alert_level", "UNKNOWN")
-        print(f"✅ Triage generated for questionnaire {questionnaire_id}: alert_level={alert_level}")
+        logger.info("questionnaire triage complete session_ref=%s alert=%s", sref, alert_level)
 
         # Update questionnaire doc status
-        db["symptom_questionnaires"].update_one(
-            {"_id": __import__("bson").ObjectId(questionnaire_id)},
-            {"$set": {"triage_status": "completed", "alert_level": alert_level}},
-        )
+        _set_questionnaire_status(db, questionnaire_id, {"triage_status": "completed", "alert_level": alert_level})
 
     except Exception as e:
-        print(f"❌ Failed to generate triage for questionnaire {questionnaire_id}: {e}")
-        try:
-            db["symptom_questionnaires"].update_one(
-                {"_id": __import__("bson").ObjectId(questionnaire_id)},
-                {"$set": {"triage_status": "failed", "triage_error": str(e)}},
-            )
-        except Exception:
-            pass  # Don't let status update failure mask the original error
+        logger.error("questionnaire triage failed session_ref=%s: %s", sref, type(e).__name__)
+        _set_questionnaire_status(db, questionnaire_id, {"triage_status": "failed", "triage_error": type(e).__name__})

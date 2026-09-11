@@ -24,4 +24,5 @@ COPY . .
 EXPOSE 10000
 
 # Run the application
-CMD ["sh", "-c", "uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-10000}"] 
+# --no-access-log: request paths carry usernames (session ids, /doctor/patient/{username})
+CMD ["sh", "-c", "uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-10000} --no-access-log"]
